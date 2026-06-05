@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>樹林煤礦歷史與廟宇文化導覽</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+
+    <style>
+        :root {
+            --primary-color: #1e293b;
+            --accent-color: #d35400;
+            --bg-color: #f8fafc;
+            --text-dark: #334155;
+            --text-light: #64748b;
+        }
+        body { 
+            margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; 
+            background-color: var(--bg-color); display: flex; flex-direction: column; height: 100vh; overflow: hidden;
+        }
+        
+        #app-header {
+            height: 70px; background-color: var(--primary-color); color: white; display: flex; align-items: center; padding: 0 24px; box-shadow: 0 2px 10px rgba(0,0,0,0.15); z-index: 2000;
+        }
+        #app-header-emblem { height: 44px; width: 44px; margin-right: 15px; }
+        #app-header h1 { font-size: 1.4rem; font-weight: 600; margin: 0; letter-spacing: 1px; }
+        #app-header-subtitle { margin-left: 12px; color: #cbd5e1; font-size: 0.95rem; font-weight: normal; }
+
+        #main-container { display: flex; flex-direction: row; flex: 1; height: calc(100vh - 70px); }
+        
+        #map { flex: 2; height: 100%; z-index: 1; }
+        
+        .leaflet-control-gps { font-size: 1.2rem; color: #334155; display: flex !important; align-items: center; justify-content: center; }
+        .leaflet-control-gps:hover { color: var(--accent-color); }
+        
+        .info.legend {
+            background: rgba(255, 255, 255, 0.95); padding: 12px 16px; font-size: 0.85rem; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.15); border: 1px solid #e2e8f0; color: var(--text-dark);
+        }
+        .info.legend h4 { margin: 0 0 8px 0; font-size: 0.9rem; color: var(--primary-color); border-bottom: 1px solid #cbd5e1; padding-bottom: 6px;}
+        .legend-item { display: flex; align-items: center; margin-bottom: 6px; }
+        .legend-item i { width: 20px; text-align: center; margin-right: 6px; font-size: 1rem;}
+        
+        .route-tooltip {
+            background-color: #334155; color: #ffffff; border: none; border-radius: 6px; font-weight: bold; padding: 6px 10px; box-shadow: 0 3px 6px rgba(0,0,0,0.2); font-size: 0.85rem;
+        }
+
+        #info-panel {
+            flex: 1; min-width: 400px; max-width: 480px; padding: 30px 24px; box-sizing: border-box; background-color: #ffffff; border-left: 1px solid #e2e8f0; box-shadow: -4px 0 20px rgba(0,0,0,0.06); overflow-y: auto; z-index: 1000; position: relative; scroll-behavior: smooth;
+        }
+        #info-panel::-webkit-scrollbar { width: 6px; }
+        #info-panel::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 4px; }
+
+        #empty-state-container { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; margin-top: 50px; }
+        #empty-state-illustration { width: 100%; max-width: 320px; margin-bottom: 30px; }
+        #empty-state-text { color: #94a3b8; font-size: 1.05rem; line-height: 1.8; }
+
+        /* ======== 標題與 SVG 插圖徽章排版 ======== */
+        #title-container { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; }
+        .unique-icon-badge {
+            display: flex; align-items: center; justify-content: center;
+            width: 52px; height: 52px; background: #fdfde8; border: 2px solid #fde047;
+            border-radius: 50%; box-shadow: 0 4px 10px rgba(211, 84, 0, 0.08); flex-shrink: 0;
+            overflow: hidden; 
+        }
+        .unique-svg-illustration { width: 36px; height: 36px; display: block; }
+
+        h2 { margin: 0; color: var(--primary-color); font-size: 1.55rem; line-height: 1.3; letter-spacing: 0.5px;}
+        
+        #tags-container { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 24px; }
+        .tag { background-color: #f1f5f9; padding: 6px 12px; border-radius: 20px; font-size: 0.75rem; color: #475569; font-weight: 600; border: 1px solid #e2e8f0;}
+        .tag.era { background-color: #fef08a; color: #854d0e; border-color: #fde047;}
+        
+        #gallery-container { position: relative; width: 100%; margin-bottom: 24px; border-radius: 12px; overflow: hidden; background: #f8fafc; border: 1px solid #e2e8f0; }
+        .gallery-img-wrapper { position: relative; width: 100%; height: 260px; background: #e2e8f0; display: flex; align-items: center; justify-content: center; }
+        .gallery-loader { position: absolute; font-size: 2.5rem; color: #cbd5e1; z-index: 0; }
+        #gallery-img { width: 100%; height: 100%; object-fit: contain; position: relative; z-index: 1; opacity: 0; transition: opacity 0.3s ease-in-out; }
+        #gallery-caption { background: #ffffff; padding: 10px 14px; font-size: 0.8rem; color: var(--text-light); text-align: right; line-height: 1.5; border-top: 1px solid #e2e8f0; min-height: 24px;}
+        
+        .slider-btn { 
+            position: absolute; top: 112px; background: rgba(255,255,255,0.9); border: none; width: 36px; height: 36px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--primary-color); box-shadow: 0 2px 8px rgba(0,0,0,0.2); z-index: 10; transition: all 0.2s;
+        }
+        .slider-btn:hover { background: #ffffff; transform: scale(1.1);}
+        #gallery-prev { left: 10px; }
+        #gallery-next { right: 10px; }
+        #gallery-counter { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.65); color: white; padding: 4px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: bold; letter-spacing: 1px; z-index: 10;}
+
+        .podcast-card { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 16px; margin-bottom: 24px; box-shadow: inset 0 0 10px rgba(255,255,255,0.5); }
+        .podcast-card h3 { margin: 0 0 12px 0; color: #166534; font-size: 1rem; display: flex; align-items: center; gap: 8px; }
+        .podcast-placeholder { background: #ffffff; border: 1px dashed #86efac; color: #22c55e; padding: 14px; text-align: center; border-radius: 8px; font-weight: 600; font-size: 0.9rem; }
+        audio { width: 100%; height: 44px; border-radius: 8px; outline: none; }
+        
+        .section-title { font-weight: 700; color: var(--primary-color); margin-bottom: 10px; font-size: 1.05rem; display: flex; align-items: center; gap: 8px;}
+        .section-title i { color: var(--accent-color); font-size: 0.9rem;}
+        .desc-text, .story-text { line-height: 1.8; color: var(--text-dark); font-size: 1rem; margin-bottom: 24px; text-align: justify;}
+        .story-container { padding-top: 20px; border-top: 1px dashed #cbd5e1; }
+        
+        .hidden { display: none !important; }
+
+        .custom-marker { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; }
+        .marker-pin {
+            width: 28px; height: 28px; background-color: var(--cat-color); border: 2px solid #ffffff; border-radius: 50%; box-shadow: 0 3px 6px rgba(0,0,0,0.3); margin-bottom: 6px; transition: all 0.2s; display: flex; align-items: center; justify-content: center;
+        }
+        .marker-pin i { color: #ffffff; font-size: 13px; }
+        .marker-label {
+            background-color: rgba(255, 255, 255, 0.95); color: var(--cat-color); padding: 4px 10px; border-radius: 6px; font-size: 0.8rem; font-weight: 700; white-space: nowrap; box-shadow: 0 2px 6px rgba(0,0,0,0.15); border: 1px solid var(--cat-color); text-align: center; transition: all 0.2s;
+        }
+        .custom-marker.active .marker-pin { transform: scale(1.25); box-shadow: 0 4px 12px rgba(0,0,0,0.4); border-width: 3px;}
+        .custom-marker.active .marker-label { background-color: var(--cat-color); color: #ffffff; }
+
+        @media (max-width: 768px) {
+            #app-header { height: 60px; padding: 0 16px; }
+            #app-header-emblem { height: 36px; width: 36px; margin-right: 10px; }
+            #app-header h1 { font-size: 1.15rem; }
+            #app-header-subtitle { display: none; }
+            #main-container { flex-direction: column; height: calc(100vh - 60px); }
+            #info-panel { 
+                min-width: 100%; max-width: 100%; height: 45vh; border-left: none; border-top-left-radius: 24px; border-top-right-radius: 24px; margin-top: -24px; padding: 24px 20px; box-shadow: 0 -4px 20px rgba(0,0,0,0.12);
+            }
+            .drag-handle { width: 40px; height: 5px; background-color: #cbd5e1; border-radius: 3px; margin: 0 auto 16px auto; display: block; }
+            #empty-state-illustration { max-width: 240px; margin-bottom: 20px;}
+            .gallery-img-wrapper { height: 200px; }
+            .slider-btn { top: 82px; }
+        }
+        @media (min-width: 769px) { .drag-handle { display: none; } }
+    </style>
+</head>
+<body>
+
+    <div id="app-header">
+        <svg id="app-header-emblem" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+            <circle cx="50" cy="50" r="48" fill="#334155" stroke="#d35400" stroke-width="3"/>
+            <path d="M20 70 L50 30 L80 70 Z" fill="#64748b"/>
+            <path d="M50 30 L80 70 L50 70 Z" fill="#475569"/>
+            <text x="50" y="66" font-size="34" text-anchor="middle" fill="#f8fafc">⚒️</text>
+        </svg>
+        <h1>樹林煤礦歷史與廟宇文化導覽</h1>
+        <span id="app-header-subtitle">在地故事 · 黑金與文化</span>
+    </div>
+    
+    <div id="main-container">
+        <div id="map"></div>
+
+        <div id="info-panel">
+            <div class="drag-handle"></div>
+            
+            <div id="empty-state">
+                <div id="empty-state-container">
+                    <svg id="empty-state-illustration" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 250">
+                        <rect width="400" height="250" fill="#f1f5f9" rx="24"/>
+                        <circle cx="320" cy="70" r="35" fill="#fde047" opacity="0.9"/>
+                        <path d="M-20 250 L120 80 L260 250 Z" fill="#cbd5e1" />
+                        <path d="M150 250 L280 120 L420 250 Z" fill="#94a3b8" />
+                        <path d="M-10 210 Q 200 210 410 240" fill="none" stroke="#64748b" stroke-width="6" stroke-dasharray="15,10" />
+                        <g transform="translate(160, 160)">
+                            <rect x="0" y="0" width="70" height="40" fill="#334155" rx="4"/>
+                            <circle cx="15" cy="-5" r="10" fill="#1e293b"/>
+                            <circle cx="35" cy="-10" r="12" fill="#1e293b"/>
+                            <circle cx="55" cy="-2" r="9" fill="#1e293b"/>
+                            <circle cx="15" cy="40" r="8" fill="#0f172a"/>
+                            <circle cx="55" cy="40" r="8" fill="#0f172a"/>
+                            <circle cx="15" cy="40" r="3" fill="#64748b"/>
+                            <circle cx="55" cy="40" r="3" fill="#64748b"/>
+                        </g>
+                        <g transform="translate(60, 170)">
+                            <rect x="8" y="20" width="6" height="25" fill="#78350f"/>
+                            <circle cx="11" cy="10" r="18" fill="#16a34a"/>
+                            <circle cx="3" cy="18" r="12" fill="#15803d"/>
+                            <circle cx="19" cy="18" r="12" fill="#15803d"/>
+                        </g>
+                        <g transform="translate(300, 150)">
+                            <rect x="10" y="30" width="6" height="30" fill="#78350f"/>
+                            <circle cx="13" cy="15" r="22" fill="#15803d"/>
+                            <circle cx="2" cy="25" r="15" fill="#166534"/>
+                            <circle cx="24" cy="25" r="15" fill="#166534"/>
+                        </g>
+                    </svg>
+                    <div id="empty-state-text">
+                        歡迎您！<br>
+                        點擊地圖上的圖標或台車路線，<br>
+                        即可在此檢視詳細的歷史影像與導覽。
+                    </div>
+                </div>
+            </div>
+
+            <div id="content-area" class="hidden">
+                <!-- 標題與極致細節 SVG 徽章 -->
+                <div id="title-container">
+                    <div id="spot-unique-icon-badge" class="unique-icon-badge">
+                        <!-- 動態 SVG 注入區 -->
+                    </div>
+                    <h2 id="spot-title">景點標題</h2>
+                </div>
+                
+                <div id="tags-container">
+                    <span id="spot-tag" class="tag"></span>
+                    <span id="spot-era" class="tag era"></span>
+                </div>
+
+                <div id="gallery-container" class="hidden">
+                    <div class="gallery-img-wrapper">
+                        <i id="gallery-loader" class="fa-solid fa-circle-notch fa-spin gallery-loader"></i>
+                        <img id="gallery-img" src="" alt="歷史影像">
+                    </div>
+                    <div id="gallery-counter">1 / 1</div>
+                    <button id="gallery-prev" class="slider-btn" onclick="prevImage()"><i class="fa-solid fa-chevron-left"></i></button>
+                    <button id="gallery-next" class="slider-btn" onclick="nextImage()"><i class="fa-solid fa-chevron-right"></i></button>
+                    <div id="gallery-caption"></div>
+                </div>
+
+                <div id="podcast-card" class="podcast-card">
+                    <h3><i class="fa-solid fa-headphones-simple"></i> 在地聲音導覽</h3>
+                    <div id="podcast-player-container"></div>
+                </div>
+
+                <div id="spot-desc-container" class="hidden">
+                    <div class="section-title"><i class="fa-solid fa-file-lines"></i> 簡介</div>
+                    <div id="spot-desc" class="desc-text"></div>
+                </div>
+                
+                <div id="spot-story-container" class="story-container hidden">
+                    <div class="section-title"><i class="fa-solid fa-book-open"></i> 歷史脈絡</div>
+                    <div id="spot-story" class="story-text"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
+
+    <script>
+        document.getElementById('empty-state').classList.remove('hidden');
+
+        // ===========================================================================
+        // 高解析度 SVG 渲染引擎
+        // ===========================================================================
+        const svgHeader = '<svg viewBox="0 0 64 64" class="unique-svg-illustration" xmlns="http://www.w3.org/2000/svg">';
+        const svgFooter = '</svg>';
+
+        function getDetailedIllustrativeSVG(name) {
+            const illustrativeMap = {
+                "大豐二號坑口": `${svgHeader}
+                    <rect x="12" y="24" width="40" height="40" fill="#e2e8f0" rx="4"/>
+                    <path d="M 16 64 L 16 32 A 16 16 0 0 1 48 32 L 48 64" fill="#0f172a" stroke="#78350f" stroke-width="4"/>
+                    <path d="M 12 34 H 52 M 12 44 H 52 M 12 54 H 52 M 22 24 V 64 M 42 24 V 64" stroke="#94a3b8" stroke-width="1" opacity="0.6"/>
+                    <path d="M 28 64 L 20 44 H 44 L 36 64" fill="none" stroke="#64748b" stroke-width="2"/>
+                    <rect x="22" y="50" width="20" height="10" fill="#475569" rx="2"/>
+                    <path d="M 24 50 Q 28 42 32 50 Q 36 44 40 50 Z" fill="#1e293b"/>
+                    <circle cx="26" cy="62" r="3" fill="#1e293b"/> <circle cx="38" cy="62" r="3" fill="#1e293b"/>
+                ${svgFooter}`,
+                "大豐一號坑口": `${svgHeader}
+                    <path d="M 14 60 L 14 34 A 18 18 0 0 1 50 34 L 50 60" fill="#1e293b" stroke="#78716c" stroke-width="4"/>
+                    <rect x="10" y="46" width="44" height="18" fill="#0284c7" opacity="0.8" rx="2"/>
+                    <path d="M 18 52 H 46 M 24 58 H 40" stroke="#bae6fd" stroke-width="1.5" stroke-linecap="round"/>
+                    <path d="M 32 16 L 32 26" stroke="#38bdf8" stroke-width="2" stroke-linecap="round" stroke-dasharray="2,4"/>
+                    <path d="M 32 30 Q 34 36 32 38 Q 30 36 32 30" fill="#38bdf8"/>
+                ${svgFooter}`,
+                "山佳舊車站": `${svgHeader}
+                    <path d="M 6 36 L 32 14 L 58 36 Z" fill="#94a3b8" stroke="#475569" stroke-width="2"/>
+                    <rect x="12" y="36" width="40" height="26" fill="#f8fafc" stroke="#64748b" stroke-width="2"/>
+                    <rect x="28" y="44" width="8" height="18" fill="#475569"/>
+                    <circle cx="32" cy="30" r="5" fill="#ffffff" stroke="#1e293b" stroke-width="1.5"/>
+                    <path d="M 32 30 L 32 27 M 32 30 L 34 30" stroke="#1e293b" stroke-width="1"/>
+                    <rect x="16" y="44" width="8" height="10" fill="#cbd5e1"/><rect x="40" y="44" width="8" height="10" fill="#cbd5e1"/>
+                ${svgFooter}`,
+                "鐵道地景公園": `${svgHeader}
+                    <rect x="18" y="16" width="28" height="30" fill="#334155" rx="4"/>
+                    <rect x="26" y="46" width="12" height="10" fill="#1e293b"/>
+                    <rect x="12" y="56" width="40" height="6" fill="#dc2626" rx="2"/>
+                    <circle cx="22" cy="56" r="6" fill="#0f172a" stroke="#cbd5e1" stroke-width="1.5"/>
+                    <circle cx="42" cy="56" r="6" fill="#0f172a" stroke="#cbd5e1" stroke-width="1.5"/>
+                    <rect x="22" y="22" width="20" height="12" fill="#bae6fd" rx="2"/>
+                    <path d="M 32 16 V 8" stroke="#475569" stroke-width="4"/>
+                    <path d="M 30 6 H 34" stroke="#475569" stroke-width="2"/>
+                ${svgFooter}`,
+                "泰興宮": `${svgHeader}
+                    <path d="M 4 36 Q 32 12 60 36 Q 50 24 32 24 Q 14 24 4 36" fill="#dc2626" stroke="#991b1b" stroke-width="2"/>
+                    <rect x="12" y="36" width="40" height="26" fill="#fef3c7"/>
+                    <rect x="18" y="36" width="6" height="26" fill="#b45309"/>
+                    <rect x="40" y="36" width="6" height="26" fill="#b45309"/>
+                    <rect x="28" y="42" width="8" height="20" fill="#78350f"/>
+                    <circle cx="32" cy="18" r="4" fill="#f59e0b"/>
+                    <path d="M 12 36 V 46 M 52 36 V 46" stroke="#ea580c" stroke-width="2"/>
+                ${svgFooter}`,
+                "山佳國小": `${svgHeader}
+                    <rect x="8" y="28" width="48" height="32" fill="#fca5a5" stroke="#b91c1c" stroke-width="2"/>
+                    <path d="M 4 28 L 32 14 L 60 28 Z" fill="#b91c1c"/>
+                    <circle cx="32" cy="22" r="5" fill="#ffffff" stroke="#991b1b" stroke-width="1"/>
+                    <path d="M 14 36 h 6 v 12 h -6 z M 44 36 h 6 v 12 h -6 z" fill="#ffffff"/>
+                    <rect x="26" y="44" width="12" height="16" fill="#78350f"/>
+                    <path d="M 32 14 V 4" stroke="#94a3b8" stroke-width="2"/>
+                ${svgFooter}`,
+                "大豐礦務所": `${svgHeader}
+                    <rect x="14" y="20" width="36" height="32" fill="#fef08a" stroke="#d97706" stroke-width="2" rx="2" transform="rotate(-5 32 32)"/>
+                    <path d="M 20 30 H 40 M 20 40 H 44 M 20 50 H 36" stroke="#3b82f6" stroke-width="2" opacity="0.6"/>
+                    <rect x="40" y="16" width="6" height="28" fill="#dc2626" rx="1" transform="rotate(35 43 30)"/>
+                    <path d="M 32 44 L 37 50 L 30 50 Z" fill="#fcd34d"/>
+                    <polygon points="32,49 34,53 30,50" fill="#1e293b"/>
+                ${svgFooter}`,
+                "蓋淡福德宮": `${svgHeader}
+                    <path d="M 32 12 C 48 12 52 24 48 36 C 44 48 36 56 32 56 C 28 56 20 48 16 36 C 12 24 16 12 32 12 Z" fill="#e2e8f0" stroke="#94a3b8" stroke-width="2"/>
+                    <circle cx="26" cy="30" r="3" fill="#1e293b"/><circle cx="38" cy="30" r="3" fill="#1e293b"/>
+                    <path d="M 32 36 Q 32 44 26 44 M 32 36 Q 32 44 38 44" fill="none" stroke="#64748b" stroke-width="2"/>
+                    <path d="M 20 20 Q 32 8 44 20" fill="none" stroke="#cbd5e1" stroke-width="4"/>
+                    <path d="M 24 50 H 40 M 28 54 H 36" stroke="#94a3b8" stroke-width="2"/>
+                ${svgFooter}`,
+                "炸藥倉庫": `${svgHeader}
+                    <rect x="22" y="24" width="8" height="32" fill="#ef4444" rx="2"/><rect x="34" y="24" width="8" height="32" fill="#ef4444" rx="2"/>
+                    <path d="M 20 32 H 44 M 20 46 H 44" stroke="#1e293b" stroke-width="2"/>
+                    <path d="M 32 24 Q 38 14 44 20" fill="none" stroke="#d97706" stroke-width="2.5"/>
+                    <circle cx="46" cy="18" r="4" fill="#fde047"/>
+                    <path d="M 46 12 V 16 M 52 18 H 48 M 46 24 V 20 M 40 18 H 44" stroke="#ea580c" stroke-width="2"/>
+                ${svgFooter}`,
+                "豐林三號坑": `${svgHeader}
+                    <path d="M 8 50 Q 32 40 56 50" fill="none" stroke="#38bdf8" stroke-width="3"/>
+                    <path d="M 12 58 Q 32 48 52 58" fill="none" stroke="#0ea5e9" stroke-width="3"/>
+                    <path d="M 32 50 Q 24 20 36 10 Q 40 24 32 50 Z" fill="#22c55e"/>
+                    <path d="M 32 54 Q 44 30 52 20 Q 56 36 32 54 Z" fill="#16a34a"/>
+                    <path d="M 32 48 Q 20 30 14 24 Q 18 36 32 48 Z" fill="#15803d"/>
+                ${svgFooter}`,
+                "大豐三號坑": `${svgHeader}
+                    <path d="M 12 16 L 40 60 H 56 L 28 16 Z" fill="#cbd5e1" stroke="#94a3b8" stroke-width="2"/>
+                    <path d="M 18 18 L 46 60" stroke="#38bdf8" stroke-width="6" opacity="0.8"/>
+                    <path d="M 24 18 L 52 60" stroke="#bae6fd" stroke-width="3" opacity="0.8"/>
+                    <path d="M 28 10 L 22 20 M 36 12 L 28 24 M 42 16 L 36 28" stroke="#1e293b" stroke-width="3" stroke-linecap="round"/>
+                ${svgFooter}`,
+                "一號坑修理室": `${svgHeader}
+                    <rect x="24" y="16" width="16" height="24" fill="#cbd5e1" rx="8"/>
+                    <path d="M 24 24 H 40 M 24 32 H 40" stroke="#94a3b8" stroke-width="2"/>
+                    <path d="M 20 28 A 12 12 0 0 0 44 28" fill="none" stroke="#475569" stroke-width="3"/>
+                    <path d="M 32 40 V 56 M 24 56 H 40" stroke="#475569" stroke-width="3" stroke-linecap="round"/>
+                    <path d="M 46 20 Q 50 16 54 20 A 4 4 0 0 1 48 24" fill="none" stroke="#f59e0b" stroke-width="2"/>
+                    <circle cx="48" cy="24" r="2" fill="#f59e0b"/>
+                ${svgFooter}`,
+                "堆棧場(一)": `${svgHeader}
+                    <path d="M 32 16 L 48 40 H 16 Z" fill="#1e293b"/>
+                    <path d="M 44 28 L 60 56 H 28 Z" fill="#334155"/>
+                    <path d="M 20 32 L 36 56 H 4 Z" fill="#0f172a"/>
+                    <polygon points="32,24 24,36 36,40" fill="#475569" opacity="0.4"/>
+                    <polygon points="44,36 36,48 50,50" fill="#475569" opacity="0.4"/>
+                ${svgFooter}`,
+                "在地滷雞腳": `${svgHeader}
+                    <path d="M 44 60 V 32 Q 44 24 36 16 M 44 32 Q 32 24 24 16 M 44 32 Q 56 24 60 16" fill="none" stroke="#92400e" stroke-width="8" stroke-linecap="round"/>
+                    <path d="M 34 14 L 30 8 M 22 14 L 16 8 M 62 14 L 66 8" stroke="#fcd34d" stroke-width="3" stroke-linecap="round"/>
+                    <ellipse cx="44" cy="60" rx="10" ry="4" fill="#78350f"/>
+                ${svgFooter}`,
+                "香菇赤肉羹": `${svgHeader}
+                    <path d="M 12 40 C 12 60 52 60 52 40 Z" fill="#f8fafc" stroke="#cbd5e1" stroke-width="2"/>
+                    <ellipse cx="32" cy="40" rx="20" ry="6" fill="#b45309"/>
+                    <path d="M 24 38 Q 30 32 36 38" fill="none" stroke="#78350f" stroke-width="6" stroke-linecap="round"/>
+                    <path d="M 16 20 L 40 48 M 22 16 L 46 44" stroke="#d97706" stroke-width="3" stroke-linecap="round"/>
+                    <path d="M 26 28 Q 28 16 30 28 M 38 32 Q 40 20 42 32" fill="none" stroke="#cbd5e1" stroke-width="2" stroke-linecap="round"/>
+                ${svgFooter}`,
+                "大豐煤礦二號坑台車路線": `${svgHeader}
+                    <path d="M 20 60 L 36 12 M 44 60 L 52 12" stroke="#475569" stroke-width="4"/>
+                    <path d="M 16 50 H 48 M 22 34 H 50 M 28 20 H 52" stroke="#78350f" stroke-width="6"/>
+                    <circle cx="16" cy="16" r="4" fill="#1e293b"/>
+                    <path d="M 16 20 V 60" stroke="#1e293b" stroke-width="2" stroke-dasharray="4,4"/>
+                ${svgFooter}`
+            };
+
+            const defaultSVG = `${svgHeader}
+                <path d="M 32 8 C 44 8 52 18 52 30 C 52 46 32 60 32 60 C 32 60 12 46 12 30 C 12 18 20 8 32 8 Z" fill="#e2e8f0" stroke="#64748b" stroke-width="3"/>
+                <circle cx="32" cy="30" r="8" fill="#3b82f6"/>
+            ${svgFooter}`;
+
+            if (name === "全興宮" || name === "永通福德宮") return illustrativeMap["泰興宮"];
+            if (name === "一號坑木工廠" || name === "鐵工廠") return `${svgHeader}<path d="M 20 12 L 12 20 M 12 20 L 32 40 M 44 12 L 52 20 M 52 20 L 32 40" stroke="#475569" stroke-width="6" stroke-linecap="round"/><circle cx="32" cy="40" r="6" fill="#b45309"/>${svgFooter}`;
+            if (name === "堆棧場(二)" || name === "堆棧場(三)") return illustrativeMap["堆棧場(一)"];
+            if (name === "福林煤礦" || name === "豐林一號坑" || name === "豐林二號坑" || name === "坡內坑煤礦" || name === "信建煤礦" || name === "山子腳煤礦" || name === "山子腳礦業所") return illustrativeMap["大豐二號坑口"];
+            if (name === "藥燉牛肉麵") return illustrativeMap["香菇赤肉羹"];
+            if (name === "一號坑理髮廳") return `${svgHeader}<rect x="24" y="12" width="16" height="40" fill="#f8fafc" stroke="#64748b" stroke-width="2" rx="4"/><path d="M 24 20 L 40 28 M 24 32 L 40 40 M 24 44 L 40 52" stroke="#dc2626" stroke-width="4"/><path d="M 24 26 L 40 34 M 24 38 L 40 46" stroke="#2563eb" stroke-width="4"/>${svgFooter}`;
+            if (name === "倉庫" || name === "工寮") return `${svgHeader}<path d="M 8 36 L 32 16 L 56 36 Z" fill="#b45309"/><rect x="16" y="36" width="32" height="20" fill="#fde68a"/><rect x="26" y="44" width="12" height="12" fill="#78350f"/>${svgFooter}`;
+            if (name === "彩繪巷") return `${svgHeader}<path d="M 20 44 C 12 32 20 12 32 12 C 44 12 52 24 52 36 C 52 52 28 60 20 44 Z" fill="#fef08a" stroke="#d97706" stroke-width="2"/><circle cx="36" cy="24" r="6" fill="#ef4444"/><circle cx="44" cy="36" r="6" fill="#3b82f6"/><circle cx="32" cy="44" r="6" fill="#22c55e"/><circle cx="26" cy="32" r="4" fill="#ffffff"/>${svgFooter}`;
+
+            return illustrativeMap[name] || defaultSVG;
+        }
+
+        // ====== 照片幻燈片邏輯 ======
+        var currentImages = [];
+        var currentImgIndex = 0;
+
+        function renderGallery() {
+            var container = document.getElementById('gallery-container');
+            if (currentImages.length === 0) {
+                container.classList.add('hidden');
+                return;
+            }
+            container.classList.remove('hidden');
+
+            var imgObj = currentImages[currentImgIndex];
+            var imgEl = document.getElementById('gallery-img');
+            var loaderEl = document.getElementById('gallery-loader');
+            
+            imgEl.style.opacity = 0;
+            loaderEl.style.display = 'block';
+
+            imgEl.onload = function() {
+                loaderEl.style.display = 'none'; 
+                imgEl.style.opacity = 1;         
+            };
+            imgEl.onerror = function() { loaderEl.style.display = 'none'; }
+
+            imgEl.src = imgObj.url;
+
+            var captionHtml = '';
+            if (imgObj.desc) captionHtml += `<strong>${imgObj.desc}</strong><br>`;
+            if (imgObj.courtesy) captionHtml += imgObj.courtesy;
+            document.getElementById('gallery-caption').innerHTML = captionHtml;
+            document.getElementById('gallery-counter').innerText = (currentImgIndex + 1) + " / " + currentImages.length;
+
+            var showBtns = currentImages.length > 1 ? 'flex' : 'none';
+            document.getElementById('gallery-prev').style.display = showBtns;
+            document.getElementById('gallery-next').style.display = showBtns;
+            document.getElementById('gallery-counter').style.display = currentImages.length > 1 ? 'block' : 'none';
+        }
+
+        window.nextImage = function() {
+            currentImgIndex = (currentImgIndex + 1) % currentImages.length;
+            renderGallery();
+        }
+        window.prevImage = function() {
+            currentImgIndex = (currentImgIndex - 1 + currentImages.length) % currentImages.length;
+            renderGallery();
+        }
+
+
+        // ====== 初始化地圖與基礎元件 ======
+        var map = L.map('map', { zoomControl: false });
+        L.control.zoom({ position: 'topleft' }).addTo(map);
+        L.control.scale({ position: 'bottomleft', imperial: false, maxWidth: 200 }).addTo(map);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { 
+            maxZoom: 19, attribution: '© OpenStreetMap' 
+        }).addTo(map);
+
+        var gpsControl = L.control({position: 'topleft'});
+        gpsControl.onAdd = function() {
+            var div = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
+            div.innerHTML = '<a href="#" class="leaflet-control-gps" title="定位我的位置" onclick="locateUser(event)"><i class="fa-solid fa-crosshairs"></i></a>';
+            return div;
+        };
+        gpsControl.addTo(map);
+
+        var userMarker = null;
+        var userCircle = null;
+        window.locateUser = function(e) {
+            e.preventDefault();
+            map.locate({setView: true, maxZoom: 16});
+        };
+        map.on('locationfound', function(e) {
+            var radius = e.accuracy / 2;
+            if (userMarker) {
+                userMarker.setLatLng(e.latlng);
+                userCircle.setLatLng(e.latlng).setRadius(radius);
+            } else {
+                userMarker = L.circleMarker(e.latlng, { radius: 8, fillColor: "#3b82f6", color: "#ffffff", weight: 3, opacity: 1, fillOpacity: 1 }).addTo(map);
+                userCircle = L.circle(e.latlng, { radius: radius, color: "#3b82f6", fillOpacity: 0.1, weight: 1 }).addTo(map);
+            }
+        });
+        map.on('locationerror', function(e) { alert("無法取得您的位置資訊，請確認是否開啟 GPS 權限。"); });
+
+        var legendControl = L.control({position: 'bottomright'});
+        legendControl.onAdd = function () {
+            var div = L.DomUtil.create('div', 'info legend');
+            div.innerHTML = '<h4><i class="fa-solid fa-map"></i> 圖標說明</h4>';
+            var cats = [
+                { name: '礦業遺構', color: '#57534e', icon: 'fa-helmet-safety' },
+                { name: '公眾信仰', color: '#dc2626', icon: 'fa-vihara' },
+                { name: '公共建設', color: '#0284c7', icon: 'fa-train' },
+                { name: '文化資源', color: '#16a34a', icon: 'fa-tree-city' },
+                { name: '常民生活', color: '#ea580c', icon: 'fa-store' },
+                { name: '台車路線', color: '#334155', icon: 'fa-route' }
+            ];
+            cats.forEach(c => {
+                div.innerHTML += `<div class="legend-item"><i class="fa-solid ${c.icon}" style="color:${c.color}"></i> <span>${c.name}</span></div>`;
+            });
+            return div;
+        };
+        legendControl.addTo(map);
+
+
+        // ====== GeoJSON 資料與圖層渲染 ======
+        var activeMarkerElement = null;
+
+        function getCategoryStyle(type1) {
+            if (type1 === '礦業遺構') return { color: '#57534e', icon: 'fa-helmet-safety' };
+            if (type1 === '公眾信仰') return { color: '#dc2626', icon: 'fa-vihara' };
+            if (type1 === '公共建設') return { color: '#0284c7', icon: 'fa-train' };
+            if (type1 === '文化資源') return { color: '#16a34a', icon: 'fa-tree-city' };
+            if (type1 === '常民生活') return { color: '#ea580c', icon: 'fa-store' };
+            return { color: '#64748b', icon: 'fa-location-dot' };
+        }
+
+        // ==========================================
+        // 核心資料區：結合你的 Podcast 網址與保留清單
+        // ==========================================
+        var directAudioUrl = "https://drive.google.com/uc?export=download&id=1_vs8ZVVOz-NwrU3DJ-PFmY0vjUOgBjmM";
+        
+        var geojsonData = {
+          "type": "FeatureCollection",
+          "features": [
+            // ====== 以下是「製作中」未提供音檔的點位 ======
+            { "type": "Feature", "geometry": { "type": "Point", "coordinates": [ 121.386618, 24.9742 ] }, "properties": { "name": "大豐二號坑口", "type1": "礦業遺構", "type2": "坑口", "desc": "這裡是清代開採、日治時期興盛的煤礦遺址，曾為山仔腳地區產量最高的重要礦坑。現場保留礦坑口、軌道、礦車與礦工模型，並設有小型文物館，重現昔日採礦生活。雖礦坑已封閉，但仍可從現地展示與環境感受當年礦工艱辛與地方煤礦文化的發展。", "story": "大豐二號坑的發展可追溯至清朝同治年間，當時因煤礦品質優良、產量豐富，逐漸成為山仔腳地區最重要的礦坑之一。到了日治時期，隨著戰爭對能源需求的增加，蓋淡坑的開採規模進一步擴大，吸引大量礦工進駐，全盛時期曾有上千人於此工作，也帶動周邊聚落的形成與繁榮，山佳因此發展成為熱鬧的煤礦山城，並促成山仔腳驛（今山佳車站）的設立，形成礦業與交通相互支撐的發展脈絡。 礦區內分為大豐一號坑與二號坑，其中二號坑為主要產區，年產量曾高達數萬公噸，為地方經濟的重要支柱。礦工的日常生活充滿艱辛與危險，長時間在狹窄、潮濕的坑道中工作，仰賴簡單工具與彼此合作維持生計；而一旁的蓋淡福德宮，則成為礦工寄託信仰、祈求平安的重要場所，反映出礦業發展與地方信仰緊密交織的生活樣貌。 隨著時代變遷與能源結構轉型，煤礦產業逐漸沒落，蓋淡坑亦於民國四十八年封坑，昔日繁盛的礦業景象隨之消退。如今礦坑本體多已坍塌，僅存經整修後的坑口、軌道與展示設施，以及小型煤礦文物館，透過實物與圖文保存礦工記憶。從過去的礦業重鎮到今日的歷史遺址，蓋淡坑見證了山佳地區產業興衰與空間轉變，也成為理解臺灣北部煤礦文化的重要場域。 蓋淡坑自清同治年間開採，因煤質優良而發展為山仔腳地區最重要的煤礦中心。日治時期隨著產量攀升至巔峰，不僅吸引千人移居，更促成山佳車站的設立與山城的繁榮。礦工在艱險坑道中相互扶持，並透過鄰近的福德宮祈求平安，展現出產業與信仰緊密交織的在地生活。隨著民國四十八年正式封坑，這段「黑金」歲月因能源轉型而逐漸消退，僅存部分遺跡與軌道供後人懷念。如今遺址已轉型為文物館，透過保存的坑口與圖文紀錄，持續見證著北台灣煤礦文化的興衰變遷。", "era": "同治年間至民國48年", "site": "樹林", "pic01_url": "https://drive.google.com/thumbnail?id=1l32e6XKCziSQptAVT41bh1Y-MmrCbAZQ&sz=w2000", "pic01_desc": "二號坑全景", "pic01_courtesy": "高子超提供，拍攝於2026/05/19", "pic02_url": "https://drive.google.com/thumbnail?id=1CeJR0wMt6JcZFCRqnOagMcSlJS1QhvLb&sz=w2000", "pic02_desc": "蓋淡坑史志碑文", "pic02_courtesy": "黃勇翔提供，拍攝於2026/05/11", "pic03_url": "https://drive.google.com/thumbnail?id=1v5vO6nsNsZAVs3suvH9ugwrxXp9Vs_pS&sz=w2000", "pic03_desc": "工寮改建之煤礦文物紀念館", "pic03_courtesy": "黃勇翔提供，拍攝於2026/05/11", "pic04_url": "https://drive.google.com/thumbnail?id=1Ul5-ylGd2qXq5c45n5obUbfVDgpKwo2u&sz=w2000", "pic04_desc": "二號坑坑口", "pic04_courtesy": "黃勇翔提供，拍攝於2026/05/11", "pic05_url": "https://drive.google.com/thumbnail?id=1O6e4yHURuzd53MhVwVA57pnkocXMGz0m&sz=w2000", "pic05_desc": "二號坑旁步道", "pic05_courtesy": "黃勇翔提供，拍攝於2026/05/11", "pic06_url": "https://drive.google.com/thumbnail?id=1oWXY0SgL3C_BeGEjk3eqoAqoC-ei5P5M&sz=w2000", "pic06_desc": "入口雕像", "pic06_courtesy": "黃勇翔提供，拍攝於2026/05/11", "pic07_url": "https://drive.google.com/thumbnail?id=1tFT6U9CXhKaALyR99DE8OOkQewMzhGkx&sz=w2000", "pic07_desc": "二號坑坑內意象(一)", "pic07_courtesy": "黃勇翔提供，拍攝於2026/05/11", "pic08_url": "https://drive.google.com/thumbnail?id=17PgMCduzIoRBJ-fcrf8gyeKYA1mmqwpi&sz=w2000", "pic08_desc": "二號坑坑內意象(二)", "pic08_courtesy": "高子超提供，拍攝於2026/05/19", "pic09_url": "https://drive.google.com/thumbnail?id=1wUI4cVhfRbhdHhER3XVIm-_ibyIxozSL&sz=w2000", "pic09_desc": "二號坑外雕像", "pic09_courtesy": "黃勇翔提供，拍攝於2026/05/11" } },
+            { "type": "Feature", "geometry": { "type": "Point", "coordinates": [ 121.392119, 24.973772 ] }, "properties": { "name": "大豐一號坑口", "type1": "礦業遺構", "type2": "坑口", "desc": "這裡為日治時期設立的煤礦坑，擁有超過八十年的開採歷史，曾是山佳地區重要的礦業據點之一。現場保留紅磚拱形坑口與礦工意象裝置，呈現當年礦工艱辛作業的情景。封坑後坑內積水，曾被用作洗衣場所，如今則成為隱身山林中的歷史遺址，帶有靜謐且略帶滄桑的氛圍。", "story": "大豐一號坑起源於1899年，歷經多次更名與轉手，是見證樹林山佳地區百年「黑金歲月」的重要煤礦遺址。全盛時期作為臺北盆地的產煤重鎮，礦區透過輕便軌道直通山佳車站，成為支撐當地生計與經濟發展的命脈。直到1984年受限於開採成本與能源政策轉向，這座支撐百年的礦坑才正式走入歷史。封坑後，坑內湧出的清澈泉水意外化作居民的天然洗衣場，為冰冷的工業遺構注入溫暖的常民生活記憶。如今殘存的坑口依然靜默矗立於山林間，守護著這段從興盛到轉型的在地文化傳奇。", "era": "1899~1984", "site": "樹林", "pic01_url": "https://drive.google.com/thumbnail?id=1aOJl-CKe2sBPj8sdRO8NI2m_9vwc1Qch&sz=w2000", "pic01_desc": "一號坑口聚落", "pic01_courtesy": "陳" } },
+            { "type": "Feature", "geometry": { "type": "Point", "coordinates": [ 121.392814, 24.972594 ] }, "properties": { "name": "山佳舊車站", "type1": "公共建設", "type2": "車站", "desc": "這是一座兼具歷史與現代特色的鐵道車站，最大特色為百年舊站與新站並存，展現新舊融合的獨特風貌。舊站房保留日治時期建築風格與洗石子外牆，見證早年煤礦運輸的發展歷史。周邊串聯鐵道公園與煤礦遺址，整體環境清幽，是結合文化與散步的特色景點。", "story": "山佳車站自1901年設站，是北臺灣唯一保存至今的二戰前日治時期車站建築，在鐵路史上具有獨特地位。早期作為煤礦運輸的核心，它曾擔負年產兩萬五千公噸「黑金」的重任，與大豐一、二號坑共同支撐起當地的產業命脈。隨著礦業沒落，車站於1962年正式更名為「山佳」，從沉重的貨運轉型為載客，守護著往返旅客的日常。如今這座古蹟車站不僅是通往歷史礦坑遺址的入口，也成為旅人探索百年煤礦風華的起點。來到這裡，遊客能在古色古香的站體中感受時光交錯，並順遊鄰近的大凍山步道，享受兼具歷史與山林的清幽之旅。", "era": "1903年(日治時期)", "site": "樹林", "pic01_url": "https://drive.google.com/thumbnail?id=1COe0gW5_5EgLfKr703BvD1ONpS-_uej_&sz=w2000", "pic01_desc": "山佳舊車站正面", "pic01_courtesy": "陳柏宇提供，拍攝於2026/04/18" } },
+            { "type": "Feature", "geometry": { "type": "Point", "coordinates": [ 121.3958, 24.9731 ] }, "properties": { "name": "鐵道地景公園", "type1": "文化資源", "type2": "人文地景", "desc": "山加鐵路地景公園位於山佳火車站旁邊，是一座結合鐵路與煤礦業的公園，展現了山佳地區發展的歷程，山佳鐵路地景公園和緊鄰之山佳彩繪街一同見證了山佳地區過往的樣貌以及產業沒落後的轉型。", "story": "山佳鐵路地景公園建立於2009年，當年鐵路局對該地區的鐵路路線進行截彎取直，在原先軌道旁開鑿隧道做為新路線，而原先鐵路經過的地區則規劃成地景公園，2017年時在園區內放置了煤斗車跟調動機，更加完整的呈現山佳過往鐵路和煤礦業的關係。", "site": "樹林", "pic01_url": "https://drive.google.com/thumbnail?id=1yXZf7ZIQ1dnIm7QWrJ4rmxTANuCEM7rz&sz=w2000", "pic01_desc": "入口處「愛」意象設施", "pic01_courtesy": "陳柏宇提供，拍攝於2026/04/18", "pic02_url": "https://drive.google.com/thumbnail?id=1tRRAzL7kXMVgo615_rIs5EHEHrfZDoSf&sz=w2000", "pic02_desc": "煤斗車與調動機", "pic02_courtesy": "陳柏宇提供" } },
+            { "type": "Feature", "geometry": { "type": "Point", "coordinates": [ 121.391443, 24.973243 ] }, "properties": { "name": "大豐礦務所", "type1": "礦業遺構", "type2": "礦務所", "era": "1960s", "site": "樹林", "pic01_url": "https://drive.google.com/thumbnail?id=1tTX1mCwjbYAcMUjWK9d3_UKt4LovDBY0&sz=w2000", "pic01_desc": "礦務所現狀", "pic01_courtesy": "陳柏宇提供，拍攝於2026/04/18" } },
+            { "type": "Feature", "geometry": { "type": "Point", "coordinates": [ 121.388608, 24.973512 ] }, "properties": { "name": "永通福德宮", "type1": "公眾信仰", "type2": "土地公", "desc": "為永通公司水塔改建，堆棧場遺址旁", "story": "在堆棧場旁邊", "site": "樹林", "pic01_url": "https://drive.google.com/thumbnail?id=1dg9qXsSJK85EHEh8TPz3jircI6AusVWD&sz=w2000", "pic01_desc": "永通福德宮全景", "pic01_courtesy": "高子超提供，拍攝於2026/05/19" } },
+            { "type": "Feature", "geometry": { "type": "Point", "coordinates": [ 121.386831, 24.973989 ] }, "properties": { "name": "蓋淡福德宮", "type1": "公眾信仰", "type2": "土地公", "desc": "現有香爐與金爐一座，入口有一對石獅", "story": "礦工下坑前都會拜", "era": "1960s", "site": "樹林", "pic01_url": "https://drive.google.com/thumbnail?id=1tltP2zZ1ozOdJXMBrKfLqKNjYCKsRhee&sz=w2000", "pic01_desc": "蓋淡福德坑全景", "pic01_courtesy": "高子超提供，拍攝於2026/05/19" } },
+            { "type": "Feature", "geometry": { "type": "Point", "coordinates": [ 121.39205, 24.973604 ] }, "properties": { "name": "一號坑木工廠", "type1": "礦業遺構", "type2": "建物", "desc": "做木工的所在，應為工具修理的場所", "era": "1960s", "site": "樹林", "pic01_url": "https://drive.google.com/thumbnail?id=1Kw2NuMl29z3a6EyXzfpvkw0tMURE5Zuf&sz=w2000", "pic01_desc": "屋頂與牆壁多已鐵皮遮蔽", "pic01_courtesy": "高子超提供，拍攝於2026/05/19" } },
+            { "type": "Feature", "geometry": { "type": "Point", "coordinates": [ 121.392174, 24.973842 ] }, "properties": { "name": "一號坑修理室", "type1": "礦業遺構", "type2": "建物", "desc": "原為紅磚屋，目前部分已改建為鐵皮屋", "era": "1960s", "site": "樹林", "pic01_url": "https://drive.google.com/thumbnail?id=1wDWyKRsZ9W3j_ynme--t2pXlrXSoFKja&sz=w2000", "pic01_desc": "現為民宅兼營卡啦OK", "pic01_courtesy": "高子超提供，拍攝於2026/05/19" } },
+            { "type": "Feature", "geometry": { "type": "Point", "coordinates": [ 121.392016, 24.973448 ] }, "properties": { "name": "一號坑理髮廳", "type1": "礦業遺構", "type2": "建物", "desc": "當時的理髮廳，現為民宅兼營推拿整復", "story": "剪頭髮的所在", "era": "1960s", "site": "樹林", "pic01_url": "https://drive.google.com/thumbnail?id=1vnBIWH1qlkHQFVpfLpFpuQCwkATr_zw_&sz=w2000", "pic01_desc": "門窗的原材質仍有保留", "pic01_courtesy": "高子超提供，拍攝於2026/05/19" } },
+            { "type": "Feature", "geometry": { "type": "Point", "coordinates": [ 121.392138, 24.973141 ] }, "properties": { "name": "堆棧場(一)", "type1": "礦業遺構", "type2": "建物", "era": "1960s", "site": "樹林", "pic01_url": "https://drive.google.com/thumbnail?id=1Ih8uIRaYOJQ0HqWBatZGfrvj4-zJiw07&sz=w2000", "pic01_desc": "堆棧場現址", "pic01_courtesy": "高子超提供，拍攝於2026/05/19" } },
+            { "type": "Feature", "geometry": { "type": "Point", "coordinates": [ 121.391544, 24.972518 ] }, "properties": { "name": "堆棧場(二)", "type1": "礦業遺構", "type2": "建物", "era": "1960s", "site": "樹林", "pic01_url": "https://drive.google.com/thumbnail?id=1zXpR2KVSysrK46XzSHQNt2y3Oa18CYm8&sz=w2000", "pic01_desc": "靠近鐵軌旁的堆棧場", "pic01_courtesy": "高子超提供，拍攝於2026/05/19" } },
+            { "type": "Feature", "geometry": { "type": "Point", "coordinates": [ 121.38843, 24.973469 ] }, "properties": { "name": "堆棧場(三)", "type1": "礦業遺構", "type2": "建物", "desc": "堆煤炭的地方", "story": "變成永通公司與民宅所在，現存永通公司建物一棟", "era": "1960s", "site": "樹林", "pic01_url": "https://drive.google.com/thumbnail?id=18b9LeSRIweOmM3LC-eEaamO1fr9vexdu&sz=w2000", "pic01_desc": "現址上方為廢棄建物一棟", "pic01_courtesy": "高子超提供，拍攝於2026/05/19" } },
+            { "type": "Feature", "geometry": { "type": "Point", "coordinates": [ 121.391617, 24.973287 ] }, "properties": { "name": "炸藥倉庫", "type1": "礦業遺構", "type2": "建物", "desc": "應為紅磚造，是放炸藥的地方，現為巡守隊與環保志工隊部", "story": "沒有爆炸過", "era": "1960s", "site": "樹林", "pic01_url": "https://drive.google.com/thumbnail?id=1z7o4_vrcaBv5ShT5bQF7g4WMPkVOw7nS&sz=w2000", "pic01_desc": "殘跡可見於隊部後方", "pic01_courtesy": "高子超提供，拍攝於2026/05/19", "pic02_url": "https://drive.google.com/thumbnail?id=1s_L8vPJZ-ATuzrHqcVr7CQWPRmiLjUoq&sz=w2000", "pic02_desc": "全景", "pic02_courtesy": "高子超提供，拍攝於2026/05/19" } },
+            { "type": "Feature", "geometry": { "type": "Point", "coordinates": [ 121.391109, 24.973192 ] }, "properties": { "name": "鐵工廠", "type1": "礦業遺構", "type2": "建物", "era": "1960s", "site": "樹林", "pic01_url": "https://drive.google.com/thumbnail?id=1dNuhfe3z9P-llt2oHlt1NO7G3LHSA3mZ&sz=w2000", "pic01_courtesy": "高子超提供，拍攝於2026/05/19" } },
+            { "type": "Feature", "geometry": { "type": "Point", "coordinates": [ 121.391479, 24.97304 ] }, "properties": { "name": "倉庫", "type1": "礦業遺構", "type2": "建物", "era": "1960s", "site": "樹林", "pic01_url": "https://drive.google.com/thumbnail?id=1A37a3EGxsZI2huvXHAfKrB4HTtJQMPlI&sz=w2000", "pic01_courtesy": "高子超提供，拍攝於2026/05/19" } },
+            { "type": "Feature", "geometry": { "type": "Point", "coordinates": [ 121.388097, 24.973215 ] }, "properties": { "name": "工寮", "type1": "礦業遺構", "type2": "宿舍", "era": "1960s", "site": "樹林", "pic01_url": "https://drive.google.com/thumbnail?id=18uXqdmegVWo_12N43MhHYXTl_d5pS6Ow&sz=w2000", "pic01_desc": "現為民宅", "pic01_courtesy": "高子超提供, 拍攝於2026/05/19" } },
+            { "type": "Feature", "geometry": { "type": "Point", "coordinates": [ 121.39493, 24.972896 ] }, "properties": { "name": "彩繪巷", "type1": "常民生活", "type2": "人文地景", "era": "現代", "site": "樹林", "pic01_url": "https://drive.google.com/thumbnail?id=1qqlUn0bQ3JofkvT1TDr3OAkV2d_vu8Qy&sz=w2000", "pic01_desc": "彩繪巷入口", "pic01_courtesy": "陳柏宇提供, 拍攝於2026/04/18" } },
+            { "type": "Feature", "geometry": { "type": "Point", "coordinates": [ 121.39278, 24.971961 ] }, "properties": { "name": "在地滷雞腳", "type1": "常民生活", "type2": "飲食文化" } },
+            { "type": "Feature", "geometry": { "type": "Point", "coordinates": [ 121.39272, 24.971344 ] }, "properties": { "name": "香菇赤肉羹", "type1": "常民生活", "type2": "飲食文化" } },
+            { "type": "Feature", "geometry": { "type": "Point", "coordinates": [ 121.3924, 24.97227 ] }, "properties": { "name": "藥燉牛肉麵", "type1": "常民生活", "type2": "飲食文化" } },
+
+            // ====== 以下是「已整合音檔」的點位 (加入 podcast_url 屬性) ======
+            { "type": "Feature", "geometry": { "type": "Point", "coordinates": [ 121.401093, 24.9757 ] }, "properties": { "name": "泰興宮", "type1": "公眾信仰", "type2": "土地公", "podcast_url": directAudioUrl, "podcast_start": 0, "desc": "這是一間位於山佳火車站北邊聚落的土地公廟，山佳地區過往煤礦業興盛，作為保佑平安的土地公廟也散布於各聚落，泰興宮就是福德街一帶祭祀的土地公廟，自建廟以來已滿百年。", "story": "現今的泰興宮為第二代廟，第一代廟建立於1926年，由余乞食信士（大豐碳礦第六任礦主）捐款所建，爾後因原本廟體之磚瓦木材歷經多年消耗導致結構受損，遂募資建設第二代廟，並於1996年完成，是為現今所見之廟體。", "site": "樹林", "pic01_url": "https://drive.google.com/thumbnail?id=1fqpNpq1C6YLrM5WIM9-g3JHuh-Sjk3g8&sz=w2000", "pic01_desc": "泰興宮廟埕", "pic01_courtesy": "陳柏宇提供，拍攝於2026/04/18" } },
+            { "type": "Feature", "geometry": { "type": "Point", "coordinates": [ 121.40185, 24.975509 ] }, "properties": { "name": "山佳國小", "type1": "常民生活", "type2": "學校", "podcast_url": directAudioUrl, "podcast_start": 0, "desc": "山佳國小是山佳地區歷史最悠久的小學，建校至今已過百年，至今仍承擔著山佳地區基礎教育的任務。順帶一提，現今的育德國小是過去山佳國小的分校，於1961年脫離並改名為育德國民學校。", "story": "山佳國小的前身可追溯至1920年的樹林公學校山子腳分離教室，爾後在1923年成為山子腳分教場，1930年升格為山子腳公學校，在戰後則改名為山佳國民學校，現今則為樹林區山佳國民小學。山佳國小自山子腳分離教室起算至今已過百年，見證了無數山佳人的成長歷程，也見證了山佳地區煤礦業的興盛與衰弱。", "site": "樹林", "pic01_url": "https://drive.google.com/thumbnail?id=1CFkwEeP0XCqoRwzx_PE3UkkIzLjZaGvF&sz=w2000", "pic01_desc": "山佳國小正門", "pic01_courtesy": "高子超提供，拍攝於2026/04/18" } },
+            { "type": "Feature", "geometry": { "type": "Point", "coordinates": [ 121.418376, 24.996252 ] }, "properties": { "name": "豐林三號坑", "type1": "礦業遺構", "type2": "坑口", "podcast_url": directAudioUrl, "podcast_start": 0, "desc": "位於樹林潭底公園活動中心旁的「豐林煤礦三坑坑口」，是見證當地早年採煤盛況的珍貴歷史遺蹟。該礦坑建於1957年（民國46年），特殊之處在於它是從平地斜挖深入地底50公尺後再平挖，至今仍保持相當完好的混凝土坑口外觀。後續因開採引發地層下陷與農民抗爭，加上進口煤炭競爭，於1967年左右停採並封閉。如今這座隱身於公園一角的平地礦坑，已成為樹林從農業到礦業發展史的靜默見證者。", "story": "這裡舊稱「潭底」，早年曾是一片水源充沛的低窪濕地，當地農民世代在此栽種鮮嫩的茭白筍。直到1957年，台電所組織的煤礦開發公司打破了這片水田的寧靜，在此開挖豐林煤礦三坑。這座礦坑非常特別，它是直接在平地上像朝地底深掘，工人們用一根根相思木扎實地撐起地底通道，一路往新莊方向掘進. 當年的採煤盛況空前，甚至連現在保安街前頭的街道，都因此被命名為「豐林街」。然而，黑金的繁華卻帶來了環境的代價，長年的地底開鑿與大量排水，導致當地的地下水位暴跌、地層嚴重下陷，賴以維生的茭白筍田紛紛乾涸，憤怒的農民因此掀起了激烈的抗爭。最終，在村民的群起反對與進口煤炭的低價衝擊下，這座興盛一時的礦坑於1967年黯然停採，將這片土地重新歸於平靜。", "era": "1950s", "site": "樹林", "pic01_url": "https://drive.google.com/thumbnail?id=1yd14ch94CB1WkPHZiJDTs6vmU5KO8T3X&sz=w2000", "pic01_desc": "正面照", "pic01_courtesy": "高子超提供, 拍攝於2026/05/19", "pic02_url": "https://drive.google.com/thumbnail?id=14jrimD5Z8mjRmmQpLKLXsL708CR0d0zJ&sz=w2000", "pic02_desc": "背面照", "pic02_courtesy": "高子超提供, 拍攝於2026/05/19" } },
+            { "type": "Feature", "geometry": { "type": "Point", "coordinates": [ 121.39473, 24.97326 ] }, "properties": { "name": "全興宮", "type1": "公眾信仰", "type2": "土地公", "podcast_url": directAudioUrl, "podcast_start": 0, "desc": "位於新北市樹林山佳（山仔腳）車站旁的全興寺（山佳土地公廟），是一座外觀樸素靜謐、供奉百年土地公的在地信仰中心。這裡位置極佳，緊鄰鐵道，參拜時能直接眺望火車疾駛而過的日常景色。在早年山佳煤礦業興盛時期，它更是礦工們入坑前祈求平安的精神寄託，至今仍默默守護著鐵道旁的樸實小鎮。", "story": "全興寺的具體創建年代已不可考，但其供奉的百年土地公神像，深深扎根於山佳的歷史記憶中。早年山佳地區是著名的煤礦產地，採礦是一份與天搏命的高風險工作，礦工們每次深入黑暗、危險的地底坑道前，都會來到這座土地公廟虔誠膜拜，祈求神明保佑出坑平安與礦產豐收。隨著時間推移，圍繞著全興寺便逐漸形成了凝聚地方情感的礦業聚落。儘管隨著煤礦業停採、聚落轉型，2015年還曾發生神像一度遭人掉包的風波，但土地公依然默默守護在車站旁，從過去保佑礦工平安的黑金歲月，到如今繼續照看著這座樸實的歷史小鎮。", "site": "樹林" } },
+            { "type": "Feature", "geometry": { "type": "Point", "coordinates": [ 121.384819, 24.9765 ] }, "properties": { "name": "大豐三號坑", "type1": "礦業遺構", "type2": "坑口", "podcast_url": directAudioUrl, "podcast_start": 0, "desc": "位於新北市樹林區信和街 49 巷底。前身為日治時期的大豐炭礦，早期坑外設有雙軌臺車道、過山隧道與混凝土水槽，將煤炭直接運至山佳車站，運輸系統十分完善。戰後該礦區經歷多次轉手與改名，最終於民國 73 年收坑停工。", "story": "大豐煤礦第三坑的前身是日治時期的大豐炭礦。戰後初期，張清圳曾因日籍產權問題申請換照遭駁回，直到民國 37 年 9 月才正式設立大豐煤礦第三坑。最終在民國56年由杜伯英的「勝和煤礦股份有限公司」接手經營。廢棄了原有的坑道並開鑿大斜坑，向深部開採具有黏結性、可供煉焦使用的木山層煤炭。在運輸方面，早期礦場是利用 400 公尺長的混凝土水槽將屑煤送至山佳車站洗煤場，塊煤則以雙軌臺車穿過輕軌與過山隧道運送。直到民國 50 年代，為了適應運輸需求開闢產業道路並改用卡車載煤，輕便車道才隨之廢棄。該礦坑最終持續營運至民國 73 年收坑停工。", "site": "樹林" } },
+            { "type": "Feature", "geometry": { "type": "Point", "coordinates": [ 121.411878, 24.991798 ] }, "properties": { "name": "福林煤礦", "type1": "礦業遺構", "type2": "坑口", "podcast_url": directAudioUrl, "podcast_start": 0, "desc": "位於樹林區的坡內坑與潭底一帶，地質屬於山子腳煤田的石底層。該礦區主要採行斜坑方式進行開採，且開採出來的煤炭會直接運往鄰近的樹林車站", "story": "福林煤礦的前身為日治時期的「樹林鑛業所一坑」，當時是由中臺商事株式會社向臺陽鑛業株式會社承包開採。然而，該礦在昭和 19 年（1944年）11 月底一度廢業，當時礦工全數遭到遣散，礦場的資產與設備也被裁撤。戰後，臺陽鑛業代表人顏欽賢重新申請換發礦業執照，隨後將礦權移轉給了顏滄海，並正式將礦場命名為「福林煤礦」。", "site": "樹林" } },
+            { "type": "Feature", "geometry": { "type": "Point", "coordinates": [ 121.411321, 24.984894 ] }, "properties": { "name": "豐林一號坑", "type1": "礦業遺構", "type2": "坑口", "podcast_url": directAudioUrl, "podcast_start": 0, "desc": "位於新北巿樹林區大同山東南方的坡內里。戰後民國 45 年由省政府公告撤銷礦權並予以保留，隔年由國營的中國煤礦開發公司申請設權並成立第一礦場。後因採礦作業引發地層下陷問題，導致農民抗議，最終於民國 60 年被迫撤收停工", "story": "與有明確日治時期前身的第二、第三礦場不同，豐林煤礦第一礦場的紀錄主要始於戰後. 民國 46 年 2 月，由國營的「中國煤礦開發股份有限公司」正式申請設權，取得面積約 61.7 公頃的礦區，並命名為「豐林煤礦第一礦場」。民國 53 年 8 月，豐林煤礦便整體移交給「臺灣電力公司」接管。然而，在移交台電經營後，豐林煤礦的採礦作業引發了嚴重的地層下陷問題，導致當地農民發起強烈抗議。在抗議與壓力下，該礦區最終於民國 60 年被迫撤收停工，走向關閉的命運。", "site": "樹林" } },
+            { "type": "Feature", "geometry": { "type": "Point", "coordinates": [ 121.4083, 24.9888 ] }, "properties": { "name": "豐林二號坑", "type1": "礦業遺構", "type2": "坑口", "podcast_url": directAudioUrl, "podcast_start": 0, "desc": "位於新北巿樹林區大同山東南方的坡內里，前身為日治時期由西川純經營的「昭和炭礦」。礦區設有一口主斜坑，開採出的普通燃料煤會以輕便鐵路運送至樹林火車站。戰後由國營中國煤礦開發公司取得礦權，最終於民國 52 年併入豐林煤礦第三礦場而註銷。", "site": "樹林" } },
+            { "type": "Feature", "geometry": { "type": "Point", "coordinates": [ 121.4055, 24.99 ] }, "properties": { "name": "坡內坑煤礦", "type1": "礦業遺構", "type2": "坑口", "podcast_url": directAudioUrl, "podcast_start": 0, "desc": "位于樹林區的坡內坑與山子腳一帶，主要坑道為平水坑，開採山子腳煤田石底層的燃料煤。礦場距離樹林火車站約 2.1 公里，出產的煤炭主要仰賴卡車運送。該礦歷經多次改名與轉手，最終於民國 70 年收坑停工。", "site": "樹林" } },
+            { "type": "Feature", "geometry": { "type": "Point", "coordinates": [ 121.3988, 24.9837 ] }, "properties": { "name": "信建煤礦", "type1": "礦業遺構", "type2": "坑口", "podcast_url": directAudioUrl, "podcast_start": 0, "desc": "位於樹林區坡內坑、山子腳與橫坑子一帶，主要開採山子腳煤田石底層的中層燃料煤。其主要坑道為長達200公尺的平水坑。礦場距離樹林火車站約2.1公里，開採出的煤炭皆以卡車進行運送。最終於民國70年收坑停工。", "site": "樹林" } },
+            { "type": "Feature", "geometry": { "type": "Point", "coordinates": [ 121.3781, 24.9729 ] }, "properties": { "name": "山子腳煤礦", "type1": "礦業遺構", "type2": "坑口", "podcast_url": directAudioUrl, "podcast_start": 0, "desc": "位於新北巿樹林區樂山里石灰坑地方。該礦主要開採山子腳煤田石底層的普通燃料煤。礦場距離山佳車站約 2.2 公里，早期設有雙軌臺車道，後另闢產業道路，改以卡車載煤。該礦最終於民國 71 年收坑停工。", "era": "昭和15年至民國71年", "site": "樹林" } },
+            { "type": "Feature", "geometry": { "type": "Point", "coordinates": [ 121.3758, 24.974 ] }, "properties": { "name": "山子腳礦業所", "type1": "礦業遺構", "type2": "坑口", "podcast_url": directAudioUrl, "podcast_start": 0, "desc": "位於樹林區阿南坑與石灰坑一帶，主要開採山子腳煤田石底層的普通燃料煤。二戰期間曾受日本政府命令而一度廢礦，直到戰後的民國 34 年才復工，並轉變為戰後的「山子腳煤礦」繼續經營。", "era": "昭和15年至日治末期", "site": "樹林" } },
+            
+            // ====== 路線保留 ======
+            {
+              "type": "Feature",
+              "properties": {
+                "name": "大豐煤礦二號坑台車路線", "type1": "礦業遺構", "desc": "由鍾心怡所完成之臺北縣縣定古蹟山佳車站調查研究及修復計畫中所載。", "era": "2008"
+              },
+              "geometry": {
+                "type": "LineString",
+                "coordinates": [
+                  [ 121.386618, 24.9742 ], [ 121.386831, 24.973989 ], [ 121.38712, 24.973616 ], [ 121.38734, 24.973471 ],
+                  [ 121.387445, 24.97344 ], [ 121.387549, 24.973435 ], [ 121.38765, 24.973424 ], [ 121.387752, 24.973396 ],
+                  [ 121.387871, 24.973358 ], [ 121.388001, 24.973343 ], [ 121.388259, 24.973339 ], [ 121.389307, 24.973318 ],
+                  [ 121.3895, 24.973212 ], [ 121.3897, 24.973132 ], [ 121.390062, 24.973021 ], [ 121.390254, 24.972984 ],
+                  [ 121.390445, 24.972939 ], [ 121.390713, 24.972778 ], [ 121.391544, 24.972518 ]
+                ]
+              }
+            }
+          ]
+        };
+
+        function preloadFirstImages() {
+            geojsonData.features.forEach(function(feature) {
+                var url = feature.properties.pic01_url;
+                if (url) { var img = new Image(); img.src = url; }
+            });
+        }
+        preloadFirstImages();
+
+        var markersClusterGroup = L.markerClusterGroup({
+            maxClusterRadius: 35, spiderfyOnMaxZoom: true, showCoverageOnHover: false, zoomToBoundsOnClick: true
+        });
+
+        var geojsonLayer = L.geoJSON(geojsonData, {
+            style: function (feature) {
+                if (feature.geometry.type === 'LineString') {
+                    return { color: '#334155', weight: 5, dashArray: '6, 8', opacity: 0.85, lineCap: 'square' };
+                }
+            },
+            pointToLayer: function (feature, latlng) {
+                var props = feature.properties;
+                var shortName = props.name || '';
+                var catStyle = getCategoryStyle(props.type1);
+                
+                var customIcon = L.divIcon({
+                    className: 'custom-marker',
+                    html: `
+                        <div class="marker-pin" style="--cat-color: ${catStyle.color};">
+                            <i class="fa-solid ${catStyle.icon}"></i>
+                        </div>
+                        <div class="marker-label" style="--cat-color: ${catStyle.color};">${shortName}</div>
+                    `,
+                    iconSize: [140, 45], iconAnchor: [70, 45]
+                });
+                return L.marker(latlng, { icon: customIcon });
+            },
+            onEachFeature: function (feature, layer) {
+                var props = feature.properties;
+                if (feature.geometry.type === 'LineString' && props.name) {
+                    layer.bindTooltip(props.name, { sticky: true, className: 'route-tooltip', direction: 'top', offset: [0, -5] });
+                }
+
+                layer.on('click', function(e) {
+                    if (feature.geometry.type === 'Point') {
+                        if (activeMarkerElement) { activeMarkerElement.classList.remove('active'); }
+                        activeMarkerElement = e.target._icon;
+                        if (activeMarkerElement) { activeMarkerElement.classList.add('active'); }
+                        map.panTo(e.latlng, { animate: true });
+                    } else if (feature.geometry.type === 'LineString') {
+                        map.fitBounds(layer.getBounds(), { padding: [50, 50] });
+                    }
+
+                    document.getElementById('empty-state').classList.add('hidden');
+                    document.getElementById('content-area').classList.remove('hidden');
+                    
+                    var spotName = props.name || '未命名景點';
+                    document.getElementById('spot-title').innerText = spotName;
+                    
+                    var uniqueSVGCode = getDetailedIllustrativeSVG(spotName);
+                    document.getElementById('spot-unique-icon-badge').innerHTML = uniqueSVGCode;
+                    
+                    var tagsContainer = document.getElementById('tags-container');
+                    var tagSpot = document.getElementById('spot-tag');
+                    var tagEra = document.getElementById('spot-era');
+                    var hasTags = false;
+                    
+                    if (props.type1) {
+                        var typeText = props.type1;
+                        if(props.type2) typeText += ' / ' + props.type2;
+                        tagSpot.innerText = typeText;
+                        tagSpot.classList.remove('hidden');
+                        hasTags = true;
+                    } else { tagSpot.classList.add('hidden'); }
+
+                    if (props.era) {
+                        tagEra.innerText = props.era;
+                        tagEra.classList.remove('hidden');
+                        hasTags = true;
+                    } else { tagEra.classList.add('hidden'); }
+                    
+                    if(hasTags) tagsContainer.classList.remove('hidden');
+                    else tagsContainer.classList.add('hidden');
+
+                    currentImages = [];
+                    for (var i = 1; i <= 9; i++) {
+                        var numStr = (i < 10) ? '0' + i : i;
+                        var picUrl = props['pic' + numStr + '_url'];
+                        if (picUrl && picUrl.trim() !== '') {
+                            currentImages.push({
+                                url: picUrl,
+                                desc: props['pic' + numStr + '_desc'] || '',
+                                grapher: props['pic' + numStr + '_grapher'] || '',
+                                courtesy: props['pic' + numStr + '_courtesy'] || ''
+                            });
+                        }
+                    }
+                    currentImgIndex = 0;
+                    renderGallery();
+
+                    // ==========================================
+                    // Podcast 播放控制邏輯 (加入精準空降功能)
+                    // ==========================================
+                    var podcastContainer = document.getElementById('podcast-player-container');
+                    if (props.podcast_url) {
+                        // 建立播放器
+                        podcastContainer.innerHTML = `<audio id="current-podcast" controls src="${props.podcast_url}"></audio>`;
+                        
+                        var audioEl = document.getElementById('current-podcast');
+                        
+                        // 若有設定開始時間，則在音檔載入完成時跳轉
+                        if (props.podcast_start !== undefined && props.podcast_start > 0) {
+                            audioEl.addEventListener('loadedmetadata', function() {
+                                audioEl.currentTime = props.podcast_start;
+                            });
+                            // 為確保跨瀏覽器相容性，增加 canplay 事件檢查
+                            audioEl.addEventListener('canplay', function() {
+                                if (audioEl.currentTime < props.podcast_start - 1 || audioEl.currentTime > props.podcast_start + 1) {
+                                    audioEl.currentTime = props.podcast_start;
+                                }
+                            });
+                        }
+                    } else {
+                        // 未設定網址，顯示佔位符
+                        podcastContainer.innerHTML = `<div class="podcast-placeholder">🎙️ 導覽錄製中... 敬請期待</div>`;
+                    }
+
+                    var descContainer = document.getElementById('spot-desc-container');
+                    var descElement = document.getElementById('spot-desc');
+                    if (props.desc) {
+                        descElement.innerText = props.desc;
+                        descContainer.classList.remove('hidden');
+                    } else { descContainer.classList.add('hidden'); }
+                    
+                    var storyContainer = document.getElementById('spot-story-container');
+                    var storyElement = document.getElementById('spot-story');
+                    if (props.story) {
+                        storyElement.innerText = props.story;
+                        storyContainer.classList.remove('hidden');
+                    } else { storyContainer.classList.add('hidden'); }
+                });
+            }
+        });
+
+        markersClusterGroup.addLayer(geojsonLayer);
+        map.addLayer(markersClusterGroup);
+        map.fitBounds(markersClusterGroup.getBounds(), { padding: [40, 40] });
+        
+    </script>
+</body>
+</html>
