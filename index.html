@@ -1,0 +1,3206 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>樹林煤礦歷史與廟宇文化導覽</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+
+    <style>
+        :root {
+            --primary-color: #1e293b;
+            --accent-color: #d35400;
+            --bg-color: #f8fafc;
+            --text-dark: #334155;
+            --text-light: #64748b;
+        }
+        body { 
+            margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; 
+            background-color: var(--bg-color); display: flex; flex-direction: column; height: 100vh; overflow: hidden;
+        }
+        
+        #app-header {
+            height: 70px; background-color: var(--primary-color); color: white; display: flex; align-items: center; padding: 0 24px; box-shadow: 0 2px 10px rgba(0,0,0,0.15); z-index: 2000;
+        }
+        #app-header-emblem { height: 44px; width: 44px; margin-right: 15px; }
+        #app-header h1 { font-size: 1.4rem; font-weight: 600; margin: 0; letter-spacing: 1px; }
+        #app-header-subtitle { margin-left: 12px; color: #cbd5e1; font-size: 0.95rem; font-weight: normal; }
+
+        #main-container { display: flex; flex-direction: row; flex: 1; height: calc(100vh - 70px); }
+        
+        #map { flex: 2; height: 100%; z-index: 1; }
+        
+        .leaflet-control-gps { font-size: 1.2rem; color: #334155; display: flex !important; align-items: center; justify-content: center; }
+        .leaflet-control-gps:hover { color: var(--accent-color); }
+        
+        .info.legend {
+            background: rgba(255, 255, 255, 0.95); padding: 12px 16px; font-size: 0.85rem; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.15); border: 1px solid #e2e8f0; color: var(--text-dark);
+        }
+        .info.legend h4 { margin: 0 0 8px 0; font-size: 0.9rem; color: var(--primary-color); border-bottom: 1px solid #cbd5e1; padding-bottom: 6px;}
+        .legend-item { display: flex; align-items: center; margin-bottom: 6px; }
+        .legend-item i { width: 20px; text-align: center; margin-right: 6px; font-size: 1rem;}
+        
+        .route-tooltip {
+            background-color: #334155; color: #ffffff; border: none; border-radius: 6px; font-weight: bold; padding: 6px 10px; box-shadow: 0 3px 6px rgba(0,0,0,0.2); font-size: 0.85rem;
+        }
+
+        #info-panel {
+            flex: 1; min-width: 400px; max-width: 480px; padding: 30px 24px; box-sizing: border-box; background-color: #ffffff; border-left: 1px solid #e2e8f0; box-shadow: -4px 0 20px rgba(0,0,0,0.06); overflow-y: auto; z-index: 1000; position: relative; scroll-behavior: smooth;
+        }
+        #info-panel::-webkit-scrollbar { width: 6px; }
+        #info-panel::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 4px; }
+
+        #empty-state-container { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; margin-top: 50px; }
+        #empty-state-illustration { width: 100%; max-width: 320px; margin-bottom: 30px; }
+        #empty-state-text { color: #94a3b8; font-size: 1.05rem; line-height: 1.8; }
+
+        /* ======== 精緻版：標題與 SVG 插圖徽章排版 ======== */
+        #title-container { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; }
+        
+        .unique-icon-badge {
+            display: flex; align-items: center; justify-content: center;
+            width: 52px; height: 52px; background: #fdfde8; border: 2px solid #fde047;
+            border-radius: 50%; box-shadow: 0 4px 10px rgba(211, 84, 0, 0.08); flex-shrink: 0;
+            overflow: hidden;
+        }
+        
+        .unique-svg-illustration {
+            width: 36px; height: 36px; display: block;
+        }
+
+        h2 { margin: 0; color: var(--primary-color); font-size: 1.55rem; line-height: 1.3; letter-spacing: 0.5px;}
+        
+        #tags-container { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 24px; }
+        .tag { background-color: #f1f5f9; padding: 6px 12px; border-radius: 20px; font-size: 0.75rem; color: #475569; font-weight: 600; border: 1px solid #e2e8f0;}
+        .tag.era { background-color: #fef08a; color: #854d0e; border-color: #fde047;}
+        
+        #gallery-container { position: relative; width: 100%; margin-bottom: 24px; border-radius: 12px; overflow: hidden; background: #f8fafc; border: 1px solid #e2e8f0; }
+        .gallery-img-wrapper { position: relative; width: 100%; height: 260px; background: #e2e8f0; display: flex; align-items: center; justify-content: center; }
+        .gallery-loader { position: absolute; font-size: 2.5rem; color: #cbd5e1; z-index: 0; }
+        #gallery-img { width: 100%; height: 100%; object-fit: contain; position: relative; z-index: 1; opacity: 0; transition: opacity 0.3s ease-in-out; }
+        #gallery-caption { background: #ffffff; padding: 10px 14px; font-size: 0.8rem; color: var(--text-light); text-align: right; line-height: 1.5; border-top: 1px solid #e2e8f0; min-height: 24px;}
+        
+        .slider-btn { 
+            position: absolute; top: 112px; background: rgba(255,255,255,0.9); border: none; width: 36px; height: 36px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--primary-color); box-shadow: 0 2px 8px rgba(0,0,0,0.2); z-index: 10; transition: all 0.2s;
+        }
+        .slider-btn:hover { background: #ffffff; transform: scale(1.1);}
+        #gallery-prev { left: 10px; }
+        #gallery-next { right: 10px; }
+        #gallery-counter { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.65); color: white; padding: 4px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: bold; letter-spacing: 1px; z-index: 10;}
+
+        .podcast-card { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 16px; margin-bottom: 24px; box-shadow: inset 0 0 10px rgba(255,255,255,0.5); }
+        .podcast-card h3 { margin: 0 0 12px 0; color: #166534; font-size: 1rem; display: flex; align-items: center; gap: 8px; }
+        .podcast-placeholder { background: #ffffff; border: 1px dashed #86efac; color: #22c55e; padding: 14px; text-align: center; border-radius: 8px; font-weight: 600; font-size: 0.9rem; }
+        audio { width: 100%; height: 44px; border-radius: 8px; outline: none; }
+        
+        .section-title { font-weight: 700; color: var(--primary-color); margin-bottom: 10px; font-size: 1.05rem; display: flex; align-items: center; gap: 8px;}
+        .section-title i { color: var(--accent-color); font-size: 0.9rem;}
+        .desc-text, .story-text { line-height: 1.8; color: var(--text-dark); font-size: 1rem; margin-bottom: 24px; text-align: justify;}
+        .story-container { padding-top: 20px; border-top: 1px dashed #cbd5e1; }
+        
+        .hidden { display: none !important; }
+
+        .custom-marker { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; }
+        .marker-pin {
+            width: 28px; height: 28px; background-color: var(--cat-color); border: 2px solid #ffffff; border-radius: 50%; box-shadow: 0 3px 6px rgba(0,0,0,0.3); margin-bottom: 6px; transition: all 0.2s; display: flex; align-items: center; justify-content: center;
+        }
+        .marker-pin i { color: #ffffff; font-size: 13px; }
+        .marker-label {
+            background-color: rgba(255, 255, 255, 0.95); color: var(--cat-color); padding: 4px 10px; border-radius: 6px; font-size: 0.8rem; font-weight: 700; white-space: nowrap; box-shadow: 0 2px 6px rgba(0,0,0,0.15); border: 1px solid var(--cat-color); text-align: center; transition: all 0.2s;
+        }
+        .custom-marker.active .marker-pin { transform: scale(1.25); box-shadow: 0 4px 12px rgba(0,0,0,0.4); border-width: 3px;}
+        .custom-marker.active .marker-label { background-color: var(--cat-color); color: #ffffff; }
+
+        @media (max-width: 768px) {
+            #app-header { height: 60px; padding: 0 16px; }
+            #app-header-emblem { height: 36px; width: 36px; margin-right: 10px; }
+            #app-header h1 { font-size: 1.15rem; }
+            #app-header-subtitle { display: none; }
+            #main-container { flex-direction: column; height: calc(100vh - 60px); }
+            #info-panel { 
+                min-width: 100%; max-width: 100%; height: 45vh; border-left: none; border-top-left-radius: 24px; border-top-right-radius: 24px; margin-top: -24px; padding: 24px 20px; box-shadow: 0 -4px 20px rgba(0,0,0,0.12);
+            }
+            .drag-handle { width: 40px; height: 5px; background-color: #cbd5e1; border-radius: 3px; margin: 0 auto 16px auto; display: block; }
+            #empty-state-illustration { max-width: 240px; margin-bottom: 20px;}
+            .gallery-img-wrapper { height: 200px; }
+            .slider-btn { top: 82px; }
+        }
+        @media (min-width: 769px) { .drag-handle { display: none; } }
+    </style>
+</head>
+<body>
+
+    <div id="app-header">
+        <svg id="app-header-emblem" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+            <circle cx="50" cy="50" r="48" fill="#334155" stroke="#d35400" stroke-width="3"/>
+            <path d="M20 70 L50 30 L80 70 Z" fill="#64748b"/>
+            <path d="M50 30 L80 70 L50 70 Z" fill="#475569"/>
+            <text x="50" y="66" font-size="34" text-anchor="middle" fill="#f8fafc">⚒️</text>
+        </svg>
+        <h1>樹林煤礦歷史與廟宇文化導覽</h1>
+        <span id="app-header-subtitle">在地故事 · 黑金與文化</span>
+    </div>
+    
+    <div id="main-container">
+        <div id="map"></div>
+
+        <div id="info-panel">
+            <div class="drag-handle"></div>
+            
+            <div id="empty-state">
+                <div id="empty-state-container">
+                    <svg id="empty-state-illustration" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 250">
+                        <rect width="400" height="250" fill="#f1f5f9" rx="24"/>
+                        <circle cx="320" cy="70" r="35" fill="#fde047" opacity="0.9"/>
+                        <path d="M-20 250 L120 80 L260 250 Z" fill="#cbd5e1" />
+                        <path d="M150 250 L280 120 L420 250 Z" fill="#94a3b8" />
+                        <path d="M-10 210 Q 200 210 410 240" fill="none" stroke="#64748b" stroke-width="6" stroke-dasharray="15,10" />
+                        <g transform="translate(160, 160)">
+                            <rect x="0" y="0" width="70" height="40" fill="#334155" rx="4"/>
+                            <circle cx="15" cy="-5" r="10" fill="#1e293b"/>
+                            <circle cx="35" cy="-10" r="12" fill="#1e293b"/>
+                            <circle cx="55" cy="-2" r="9" fill="#1e293b"/>
+                            <circle cx="15" cy="40" r="8" fill="#0f172a"/>
+                            <circle cx="55" cy="40" r="8" fill="#0f172a"/>
+                            <circle cx="15" cy="40" r="3" fill="#64748b"/>
+                            <circle cx="55" cy="40" r="3" fill="#64748b"/>
+                        </g>
+                        <g transform="translate(60, 170)">
+                            <rect x="8" y="20" width="6" height="25" fill="#78350f"/>
+                            <circle cx="11" cy="10" r="18" fill="#16a34a"/>
+                            <circle cx="3" cy="18" r="12" fill="#15803d"/>
+                            <circle cx="19" cy="18" r="12" fill="#15803d"/>
+                        </g>
+                        <g transform="translate(300, 150)">
+                            <rect x="10" y="30" width="6" height="30" fill="#78350f"/>
+                            <circle cx="13" cy="15" r="22" fill="#15803d"/>
+                            <circle cx="2" cy="25" r="15" fill="#166534"/>
+                            <circle cx="24" cy="25" r="15" fill="#166534"/>
+                        </g>
+                    </svg>
+                    <div id="empty-state-text">
+                        歡迎您！<br>
+                        點擊地圖上的圖標或台車路線，<br>
+                        即可在此檢視詳細的歷史影像與導覽。
+                    </div>
+                </div>
+            </div>
+
+            <div id="content-area" class="hidden">
+                <div id="title-container">
+                    <div id="spot-unique-icon-badge" class="unique-icon-badge">
+                        </div>
+                    <h2 id="spot-title">景點標題</h2>
+                </div>
+                
+                <div id="tags-container">
+                    <span id="spot-tag" class="tag"></span>
+                    <span id="spot-era" class="tag era"></span>
+                </div>
+
+                <div id="gallery-container" class="hidden">
+                    <div class="gallery-img-wrapper">
+                        <i id="gallery-loader" class="fa-solid fa-circle-notch fa-spin gallery-loader"></i>
+                        <img id="gallery-img" src="" alt="歷史影像">
+                    </div>
+                    <div id="gallery-counter">1 / 1</div>
+                    <button id="gallery-prev" class="slider-btn" onclick="prevImage()"><i class="fa-solid fa-chevron-left"></i></button>
+                    <button id="gallery-next" class="slider-btn" onclick="nextImage()"><i class="fa-solid fa-chevron-right"></i></button>
+                    <div id="gallery-caption"></div>
+                </div>
+
+                <div id="podcast-card" class="podcast-card">
+                    <h3><i class="fa-solid fa-headphones-simple"></i> 在地聲音導覽</h3>
+                    <div id="podcast-player-container"></div>
+                </div>
+
+                <div id="spot-desc-container" class="hidden">
+                    <div class="section-title"><i class="fa-solid fa-file-lines"></i> 簡介</div>
+                    <div id="spot-desc" class="desc-text"></div>
+                </div>
+                
+                <div id="spot-story-container" class="story-container hidden">
+                    <div class="section-title"><i class="fa-solid fa-book-open"></i> 歷史脈絡</div>
+                    <div id="spot-story" class="story-text"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
+
+    <script>
+        document.getElementById('empty-state').classList.remove('hidden');
+
+        // ===========================================================================
+        // 核心亮點：高解析度、多圖層、高細節的純手工 SVG 渲染引擎 (取代 Emoji)
+        // 畫布設定為 64x64，確保在大螢幕也能呈現精緻質感
+        // ===========================================================================
+        const svgHeader = '<svg viewBox="0 0 64 64" class="unique-svg-illustration" xmlns="http://www.w3.org/2000/svg">';
+        const svgFooter = '</svg>';
+
+        function getDetailedIllustrativeSVG(name) {
+            
+            const illustrativeMap = {
+                // 【礦坑與軌道】大豐二號坑口
+                "大豐煤礦二號坑口": `${svgHeader}
+                    <rect x="12" y="24" width="40" height="40" fill="#e2e8f0" rx="4"/>
+                    <path d="M 16 64 L 16 32 A 16 16 0 0 1 48 32 L 48 64" fill="#0f172a" stroke="#78350f" stroke-width="4"/>
+                    <path d="M 12 34 H 52 M 12 44 H 52 M 12 54 H 52 M 22 24 V 64 M 42 24 V 64" stroke="#94a3b8" stroke-width="1" opacity="0.6"/>
+                    <path d="M 28 64 L 20 44 H 44 L 36 64" fill="none" stroke="#64748b" stroke-width="2"/>
+                    <rect x="22" y="50" width="20" height="10" fill="#475569" rx="2"/>
+                    <path d="M 24 50 Q 28 42 32 50 Q 36 44 40 50 Z" fill="#1e293b"/>
+                    <circle cx="26" cy="62" r="3" fill="#1e293b"/> <circle cx="38" cy="62" r="3" fill="#1e293b"/>
+                ${svgFooter}`,
+                
+                // 【積水與滄桑】大豐一號坑口
+                "大豐煤礦一號坑口": `${svgHeader}
+                    <path d="M 14 60 L 14 34 A 18 18 0 0 1 50 34 L 50 60" fill="#1e293b" stroke="#78716c" stroke-width="4"/>
+                    <rect x="10" y="46" width="44" height="18" fill="#0284c7" opacity="0.8" rx="2"/>
+                    <path d="M 18 52 H 46 M 24 58 H 40" stroke="#bae6fd" stroke-width="1.5" stroke-linecap="round"/>
+                    <path d="M 32 16 L 32 26" stroke="#38bdf8" stroke-width="2" stroke-linecap="round" stroke-dasharray="2,4"/>
+                    <path d="M 32 30 Q 34 36 32 38 Q 30 36 32 30" fill="#38bdf8"/>
+                ${svgFooter}`,
+                
+                // 【百年古蹟】山佳舊車站
+                "山佳舊車站": `${svgHeader}
+                    <path d="M 6 36 L 32 14 L 58 36 Z" fill="#94a3b8" stroke="#475569" stroke-width="2"/>
+                    <rect x="12" y="36" width="40" height="26" fill="#f8fafc" stroke="#64748b" stroke-width="2"/>
+                    <rect x="28" y="44" width="8" height="18" fill="#475569"/>
+                    <circle cx="32" cy="30" r="5" fill="#ffffff" stroke="#1e293b" stroke-width="1.5"/>
+                    <path d="M 32 30 L 32 27 M 32 30 L 34 30" stroke="#1e293b" stroke-width="1"/>
+                    <rect x="16" y="44" width="8" height="10" fill="#cbd5e1"/><rect x="40" y="44" width="8" height="10" fill="#cbd5e1"/>
+                ${svgFooter}`,
+                
+                // 【火車頭】鐵道地景公園
+                "山佳鐵道地景公園": `${svgHeader}
+                    <rect x="18" y="16" width="28" height="30" fill="#334155" rx="4"/>
+                    <rect x="26" y="46" width="12" height="10" fill="#1e293b"/>
+                    <rect x="12" y="56" width="40" height="6" fill="#dc2626" rx="2"/>
+                    <circle cx="22" cy="56" r="6" fill="#0f172a" stroke="#cbd5e1" stroke-width="1.5"/>
+                    <circle cx="42" cy="56" r="6" fill="#0f172a" stroke="#cbd5e1" stroke-width="1.5"/>
+                    <rect x="22" y="22" width="20" height="12" fill="#bae6fd" rx="2"/>
+                    <path d="M 32 16 V 8" stroke="#475569" stroke-width="4"/>
+                    <path d="M 30 6 H 34" stroke="#475569" stroke-width="2"/>
+                ${svgFooter}`,
+                
+                // 【百年廟宇】泰興宮
+                "泰興宮": `${svgHeader}
+                    <path d="M 4 36 Q 32 12 60 36 Q 50 24 32 24 Q 14 24 4 36" fill="#dc2626" stroke="#991b1b" stroke-width="2"/>
+                    <rect x="12" y="36" width="40" height="26" fill="#fef3c7"/>
+                    <rect x="18" y="36" width="6" height="26" fill="#b45309"/>
+                    <rect x="40" y="36" width="6" height="26" fill="#b45309"/>
+                    <rect x="28" y="42" width="8" height="20" fill="#78350f"/>
+                    <circle cx="32" cy="18" r="4" fill="#f59e0b"/>
+                    <path d="M 12 36 V 46 M 52 36 V 46" stroke="#ea580c" stroke-width="2"/>
+                ${svgFooter}`,
+                
+                // 【老校舍】山佳國小
+                "山佳國小": `${svgHeader}
+                    <rect x="8" y="28" width="48" height="32" fill="#fca5a5" stroke="#b91c1c" stroke-width="2"/>
+                    <path d="M 4 28 L 32 14 L 60 28 Z" fill="#b91c1c"/>
+                    <circle cx="32" cy="22" r="5" fill="#ffffff" stroke="#991b1b" stroke-width="1"/>
+                    <path d="M 14 36 h 6 v 12 h -6 z M 44 36 h 6 v 12 h -6 z" fill="#ffffff"/>
+                    <rect x="26" y="44" width="12" height="16" fill="#78350f"/>
+                    <path d="M 32 14 V 4" stroke="#94a3b8" stroke-width="2"/>
+                ${svgFooter}`,
+                
+                // 【辦公與設計】大豐礦務所
+                "大豐礦務所": `${svgHeader}
+                    <rect x="14" y="20" width="36" height="32" fill="#fef08a" stroke="#d97706" stroke-width="2" rx="2" transform="rotate(-5 32 32)"/>
+                    <path d="M 20 30 H 40 M 20 40 H 44 M 20 50 H 36" stroke="#3b82f6" stroke-width="2" opacity="0.6"/>
+                    <rect x="40" y="16" width="6" height="28" fill="#dc2626" rx="1" transform="rotate(35 43 30)"/>
+                    <path d="M 32 44 L 37 50 L 30 50 Z" fill="#fcd34d"/>
+                    <polygon points="32,49 34,53 30,50" fill="#1e293b"/>
+                ${svgFooter}`,
+                
+                // 【神聖守護】蓋淡福德宮
+                "蓋淡福德宮": `${svgHeader}
+                    <path d="M 32 12 C 48 12 52 24 48 36 C 44 48 36 56 32 56 C 28 56 20 48 16 36 C 12 24 16 12 32 12 Z" fill="#e2e8f0" stroke="#94a3b8" stroke-width="2"/>
+                    <circle cx="26" cy="30" r="3" fill="#1e293b"/><circle cx="38" cy="30" r="3" fill="#1e293b"/>
+                    <path d="M 32 36 Q 32 44 26 44 M 32 36 Q 32 44 38 44" fill="none" stroke="#64748b" stroke-width="2"/>
+                    <path d="M 20 20 Q 32 8 44 20" fill="none" stroke="#cbd5e1" stroke-width="4"/>
+                    <path d="M 24 50 H 40 M 28 54 H 36" stroke="#94a3b8" stroke-width="2"/>
+                ${svgFooter}`,
+                
+                // 【危險與火花】炸藥倉庫
+                "炸藥倉庫": `${svgHeader}
+                    <rect x="22" y="24" width="8" height="32" fill="#ef4444" rx="2"/><rect x="34" y="24" width="8" height="32" fill="#ef4444" rx="2"/>
+                    <path d="M 20 32 H 44 M 20 46 H 44" stroke="#1e293b" stroke-width="2"/>
+                    <path d="M 32 24 Q 38 14 44 20" fill="none" stroke="#d97706" stroke-width="2.5"/>
+                    <circle cx="46" cy="18" r="4" fill="#fde047"/>
+                    <path d="M 46 12 V 16 M 52 18 H 48 M 46 24 V 20 M 40 18 H 44" stroke="#ea580c" stroke-width="2"/>
+                ${svgFooter}`,
+                
+                // 【自然與農業】豐林三號坑
+                "豐林三號坑口": `${svgHeader}
+                    <path d="M 8 50 Q 32 40 56 50" fill="none" stroke="#38bdf8" stroke-width="3"/>
+                    <path d="M 12 58 Q 32 48 52 58" fill="none" stroke="#0ea5e9" stroke-width="3"/>
+                    <path d="M 32 50 Q 24 20 36 10 Q 40 24 32 50 Z" fill="#22c55e"/>
+                    <path d="M 32 54 Q 44 30 52 20 Q 56 36 32 54 Z" fill="#16a34a"/>
+                    <path d="M 32 48 Q 20 30 14 24 Q 18 36 32 48 Z" fill="#15803d"/>
+                ${svgFooter}`,
+                
+                // 【水洗煤炭】大豐三號坑
+                "大豐煤礦三號坑": `${svgHeader}
+                    <path d="M 12 16 L 40 60 H 56 L 28 16 Z" fill="#cbd5e1" stroke="#94a3b8" stroke-width="2"/>
+                    <path d="M 18 18 L 46 60" stroke="#38bdf8" stroke-width="6" opacity="0.8"/>
+                    <path d="M 24 18 L 52 60" stroke="#bae6fd" stroke-width="3" opacity="0.8"/>
+                    <path d="M 28 10 L 22 20 M 36 12 L 28 24 M 42 16 L 36 28" stroke="#1e293b" stroke-width="3" stroke-linecap="round"/>
+                ${svgFooter}`,
+                
+                // 【卡拉OK】一號坑修理室
+                "一號坑修理室": `${svgHeader}
+                    <rect x="24" y="16" width="16" height="24" fill="#cbd5e1" rx="8"/>
+                    <path d="M 24 24 H 40 M 24 32 H 40" stroke="#94a3b8" stroke-width="2"/>
+                    <path d="M 20 28 A 12 12 0 0 0 44 28" fill="none" stroke="#475569" stroke-width="3"/>
+                    <path d="M 32 40 V 56 M 24 56 H 40" stroke="#475569" stroke-width="3" stroke-linecap="round"/>
+                    <path d="M 46 20 Q 50 16 54 20 A 4 4 0 0 1 48 24" fill="none" stroke="#f59e0b" stroke-width="2"/>
+                    <circle cx="48" cy="24" r="2" fill="#f59e0b"/>
+                ${svgFooter}`,
+                
+                // 【煤炭堆棧】堆棧場(一)
+                "大豐煤礦堆棧場（一）": `${svgHeader}
+                    <path d="M 32 16 L 48 40 H 16 Z" fill="#1e293b"/>
+                    <path d="M 44 28 L 60 56 H 28 Z" fill="#334155"/>
+                    <path d="M 20 32 L 36 56 H 4 Z" fill="#0f172a"/>
+                    <polygon points="32,24 24,36 36,40" fill="#475569" opacity="0.4"/>
+                    <polygon points="44,36 36,48 50,50" fill="#475569" opacity="0.4"/>
+                ${svgFooter}`,
+                
+                // 【常民美食】在地滷雞腳
+                "山佳煙燻雞腳": `${svgHeader}
+                    <path d="M 44 60 V 32 Q 44 24 36 16 M 44 32 Q 32 24 24 16 M 44 32 Q 56 24 60 16" fill="none" stroke="#92400e" stroke-width="8" stroke-linecap="round"/>
+                    <path d="M 34 14 L 30 8 M 22 14 L 16 8 M 62 14 L 66 8" stroke="#fcd34d" stroke-width="3" stroke-linecap="round"/>
+                    <ellipse cx="44" cy="60" rx="10" ry="4" fill="#78350f"/>
+                ${svgFooter}`,
+                
+                // 【常民美食】香菇赤肉羹
+                "雲林香菇赤肉羹": `${svgHeader}
+                    <path d="M 12 40 C 12 60 52 60 52 40 Z" fill="#f8fafc" stroke="#cbd5e1" stroke-width="2"/>
+                    <ellipse cx="32" cy="40" rx="20" ry="6" fill="#b45309"/>
+                    <path d="M 24 38 Q 30 32 36 38" fill="none" stroke="#78350f" stroke-width="6" stroke-linecap="round"/>
+                    <path d="M 16 20 L 40 48 M 22 16 L 46 44" stroke="#d97706" stroke-width="3" stroke-linecap="round"/>
+                    <path d="M 26 28 Q 28 16 30 28 M 38 32 Q 40 20 42 32" fill="none" stroke="#cbd5e1" stroke-width="2" stroke-linecap="round"/>
+                ${svgFooter}`,
+                
+                // 【軌道路線】大豐煤礦二號坑台車路線
+                "大豐煤礦二號坑台車路線": `${svgHeader}
+                    <path d="M 20 60 L 36 12 M 44 60 L 52 12" stroke="#475569" stroke-width="4"/>
+                    <path d="M 16 50 H 48 M 22 34 H 50 M 28 20 H 52" stroke="#78350f" stroke-width="6"/>
+                    <circle cx="16" cy="16" r="4" fill="#1e293b"/>
+                    <path d="M 16 20 V 60" stroke="#1e293b" stroke-width="2" stroke-dasharray="4,4"/>
+                ${svgFooter}`,
+
+                // 【新增：心圓柑仔店】復古糖果罐
+                "心圓柑仔店": `${svgHeader}
+                    <path d="M 22 20 Q 16 32 20 48 Q 24 56 32 56 Q 40 56 44 48 Q 48 32 42 20 Z" fill="#bae6fd" stroke="#38bdf8" stroke-width="2"/>
+                    <rect x="24" y="14" width="16" height="6" fill="#94a3b8" rx="2"/>
+                    <circle cx="32" cy="40" r="6" fill="#ef4444"/>
+                    <circle cx="26" cy="34" r="4" fill="#fde047"/>
+                    <circle cx="38" cy="34" r="4" fill="#22c55e"/>
+                    <path d="M 28 20 L 36 20" stroke="#cbd5e1" stroke-width="2"/>
+                ${svgFooter}`,
+                
+                // 【新增：麗華西點麵包行】牛角麵包
+                "麗華西點麵包行": `${svgHeader}
+                    <path d="M 12 36 Q 32 16 52 36 Q 56 44 44 48 Q 32 52 20 48 Q 8 44 12 36 Z" fill="#f59e0b" stroke="#b45309" stroke-width="2"/>
+                    <path d="M 20 32 Q 28 24 36 32" fill="none" stroke="#d97706" stroke-width="3" stroke-linecap="round"/>
+                    <path d="M 32 30 Q 40 22 48 30" fill="none" stroke="#d97706" stroke-width="3" stroke-linecap="round"/>
+                    <path d="M 16 40 Q 32 46 48 40" fill="none" stroke="#d97706" stroke-width="2"/>
+                ${svgFooter}`,
+                
+                // 【新增：萌德蔘藥房】中藥搗藥缽
+                "萌德蔘藥房": `${svgHeader}
+                    <path d="M 16 40 L 20 56 Q 32 60 44 56 L 48 40 Z" fill="#64748b" stroke="#334155" stroke-width="2"/>
+                    <ellipse cx="32" cy="40" rx="16" ry="6" fill="#475569"/>
+                    <path d="M 40 24 L 36 42" stroke="#d97706" stroke-width="6" stroke-linecap="round"/>
+                    <ellipse cx="32" cy="40" rx="12" ry="4" fill="#1e293b"/>
+                ${svgFooter}`,
+                
+                // 【新增：樹林酒廠】紅麴酒甕
+                "樹林酒廠": `${svgHeader}
+                    <path d="M 24 20 L 20 52 Q 32 60 44 52 L 40 20 Z" fill="#78350f" stroke="#451a03" stroke-width="2"/>
+                    <rect x="28" y="8" width="8" height="12" fill="#78350f"/>
+                    <path d="M 18 30 H 46 M 18 42 H 46" stroke="#92400e" stroke-width="3"/>
+                    <rect x="26" y="6" width="12" height="4" fill="#ef4444" rx="2"/>
+                    <text x="32" y="38" font-size="10" text-anchor="middle" fill="#fcd34d" font-weight="bold">酒</text>
+                ${svgFooter}`,
+                
+                // 【新增：微間素生】質感咖啡杯
+                "微間素生": `${svgHeader}
+                    <path d="M 20 28 L 24 52 Q 32 56 40 52 L 44 28 Z" fill="#f8fafc" stroke="#94a3b8" stroke-width="2"/>
+                    <path d="M 44 32 Q 52 32 52 40 Q 52 48 42 48" fill="none" stroke="#94a3b8" stroke-width="3" stroke-linecap="round"/>
+                    <ellipse cx="32" cy="28" rx="12" ry="4" fill="#e2e8f0"/>
+                    <ellipse cx="32" cy="28" rx="10" ry="2" fill="#78350f"/>
+                    <path d="M 28 16 Q 30 8 32 16 T 36 8" fill="none" stroke="#cbd5e1" stroke-width="2" stroke-linecap="round"/>
+                ${svgFooter}`,
+                
+                // 【新增：紅磚園邸】紅磚牆老屋
+                "紅磚園邸": `${svgHeader}
+                    <rect x="16" y="24" width="32" height="32" fill="#b91c1c" stroke="#7f1d1d" stroke-width="2"/>
+                    <path d="M 16 32 H 48 M 16 40 H 48 M 16 48 H 48" stroke="#fca5a5" stroke-width="1"/>
+                    <path d="M 24 24 V 32 M 40 24 V 32 M 32 32 V 40 M 24 40 V 48 M 40 40 V 48 M 32 48 V 56" stroke="#fca5a5" stroke-width="1"/>
+                    <path d="M 12 24 L 32 10 L 52 24 Z" fill="#475569" stroke="#1e293b" stroke-width="2"/>
+                ${svgFooter}`
+            };
+
+            const defaultSVG = `${svgHeader}
+                <path d="M 32 8 C 44 8 52 18 52 30 C 52 46 32 60 32 60 C 32 60 12 46 12 30 C 12 18 20 8 32 8 Z" fill="#e2e8f0" stroke="#64748b" stroke-width="3"/>
+                <circle cx="32" cy="30" r="8" fill="#3b82f6"/>
+            ${svgFooter}`;
+
+            // 針對相同屬性景點進行圖示映射共用
+            if (name === "濟安宮" || name === "全興宮" || name === "永通福德宮") return illustrativeMap["泰興宮"];
+            if (name === "大豐煤礦礦務所" || name === "大豐礦務所") return illustrativeMap["大豐礦務所"];
+            if (name === "山佳巷彩繪巷" || name === "彩繪巷") return `${svgHeader}<path d="M 20 44 C 12 32 20 12 32 12 C 44 12 52 24 52 36 C 52 52 28 60 20 44 Z" fill="#fef08a" stroke="#d97706" stroke-width="2"/><circle cx="36" cy="24" r="6" fill="#ef4444"/><circle cx="44" cy="36" r="6" fill="#3b82f6"/><circle cx="32" cy="44" r="6" fill="#22c55e"/><circle cx="26" cy="32" r="4" fill="#ffffff"/>${svgFooter}`;
+            if (name === "一號坑木工廠" || name === "鐵工廠") return `${svgHeader}<path d="M 20 12 L 12 20 M 12 20 L 32 40 M 44 12 L 52 20 M 52 20 L 32 40" stroke="#475569" stroke-width="6" stroke-linecap="round"/><circle cx="32" cy="40" r="6" fill="#b45309"/>${svgFooter}`;
+            if (name === "大豐煤礦堆棧場（二）" || name === "大豐煤礦堆棧場（三）" || name === "堆棧場(一)" || name === "堆棧場(二)" || name === "堆棧場(三)") return illustrativeMap["大豐煤礦堆棧場（一）"];
+            if (name === "福林煤礦" || name === "豐林煤礦一號坑" || name === "豐林煤礦二號坑" || name === "坡內坑煤礦" || name === "信建煤礦" || name === "山子腳煤礦" || name === "山子腳礦業所" || name === "豐林煤礦三號坑口") return illustrativeMap["大豐煤礦二號坑口"];
+            if (name === "藥燉牛肉麵") return illustrativeMap["雲林香菇赤肉羹"];
+            if (name === "一號坑理髮廳") return `${svgHeader}<rect x="24" y="12" width="16" height="40" fill="#f8fafc" stroke="#64748b" stroke-width="2" rx="4"/><path d="M 24 20 L 40 28 M 24 32 L 40 40 M 24 44 L 40 52" stroke="#dc2626" stroke-width="4"/><path d="M 24 26 L 40 34 M 24 38 L 40 46" stroke="#2563eb" stroke-width="4"/>${svgFooter}`;
+            if (name === "倉庫" || name === "工寮") return `${svgHeader}<path d="M 8 36 L 32 16 L 56 36 Z" fill="#b45309"/><rect x="16" y="36" width="32" height="20" fill="#fde68a"/><rect x="26" y="44" width="12" height="12" fill="#78350f"/>${svgFooter}`;
+
+            return illustrativeMap[name] || defaultSVG;
+        }
+
+        // ====== 2. 照片幻燈片邏輯 ======
+        var currentImages = [];
+        var currentImgIndex = 0;
+
+        function renderGallery() {
+            var container = document.getElementById('gallery-container');
+            if (currentImages.length === 0) {
+                container.classList.add('hidden');
+                return;
+            }
+            container.classList.remove('hidden');
+
+            var imgObj = currentImages[currentImgIndex];
+            var imgEl = document.getElementById('gallery-img');
+            var loaderEl = document.getElementById('gallery-loader');
+            
+            imgEl.style.opacity = 0;
+            loaderEl.style.display = 'block';
+
+            imgEl.onload = function() {
+                loaderEl.style.display = 'none'; 
+                imgEl.style.opacity = 1;         
+            };
+            imgEl.onerror = function() { loaderEl.style.display = 'none'; }
+
+            imgEl.src = imgObj.url;
+
+            var captionHtml = '';
+            if (imgObj.desc) captionHtml += `<strong>${imgObj.desc}</strong><br>`;
+            if (imgObj.grapher) captionHtml += `攝影：${imgObj.grapher} / `;
+            if (imgObj.courtesy) captionHtml += imgObj.courtesy;
+            document.getElementById('gallery-caption').innerHTML = captionHtml;
+            document.getElementById('gallery-counter').innerText = (currentImgIndex + 1) + " / " + currentImages.length;
+
+            var showBtns = currentImages.length > 1 ? 'flex' : 'none';
+            document.getElementById('gallery-prev').style.display = showBtns;
+            document.getElementById('gallery-next').style.display = showBtns;
+            document.getElementById('gallery-counter').style.display = currentImages.length > 1 ? 'block' : 'none';
+        }
+
+        window.nextImage = function() {
+            currentImgIndex = (currentImgIndex + 1) % currentImages.length;
+            renderGallery();
+        }
+        window.prevImage = function() {
+            currentImgIndex = (currentImgIndex - 1 + currentImages.length) % currentImages.length;
+            renderGallery();
+        }
+
+
+        // ====== 3. 初始化地圖與基礎元件 ======
+        var map = L.map('map', { zoomControl: false });
+        L.control.zoom({ position: 'topleft' }).addTo(map);
+        L.control.scale({ position: 'bottomleft', imperial: false, maxWidth: 200 }).addTo(map);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { 
+            maxZoom: 19, attribution: '© OpenStreetMap' 
+        }).addTo(map);
+
+        var gpsControl = L.control({position: 'topleft'});
+        gpsControl.onAdd = function() {
+            var div = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
+            div.innerHTML = '<a href="#" class="leaflet-control-gps" title="定位我的位置" onclick="locateUser(event)"><i class="fa-solid fa-crosshairs"></i></a>';
+            return div;
+        };
+        gpsControl.addTo(map);
+
+        var userMarker = null;
+        var userCircle = null;
+        window.locateUser = function(e) {
+            e.preventDefault();
+            map.locate({setView: true, maxZoom: 16});
+        };
+        map.on('locationfound', function(e) {
+            var radius = e.accuracy / 2;
+            if (userMarker) {
+                userMarker.setLatLng(e.latlng);
+                userCircle.setLatLng(e.latlng).setRadius(radius);
+            } else {
+                userMarker = L.circleMarker(e.latlng, { radius: 8, fillColor: "#3b82f6", color: "#ffffff", weight: 3, opacity: 1, fillOpacity: 1 }).addTo(map);
+                userCircle = L.circle(e.latlng, { radius: radius, color: "#3b82f6", fillOpacity: 0.1, weight: 1 }).addTo(map);
+            }
+        });
+        map.on('locationerror', function(e) { alert("無法取得您的位置資訊，請確認是否開啟 GPS 權限。"); });
+
+        var legendControl = L.control({position: 'bottomright'});
+        legendControl.onAdd = function () {
+            var div = L.DomUtil.create('div', 'info legend');
+            div.innerHTML = '<h4><i class="fa-solid fa-map"></i> 圖標說明</h4>';
+            var cats = [
+                { name: '礦業遺構', color: '#57534e', icon: 'fa-helmet-safety' },
+                { name: '公眾信仰', color: '#dc2626', icon: 'fa-vihara' },
+                { name: '公共建設', color: '#0284c7', icon: 'fa-train' },
+                { name: '文化資源', color: '#16a34a', icon: 'fa-tree-city' },
+                { name: '常民生活', color: '#ea580c', icon: 'fa-store' },
+                { name: '台車路線', color: '#334155', icon: 'fa-route' }
+            ];
+            cats.forEach(c => {
+                div.innerHTML += `<div class="legend-item"><i class="fa-solid ${c.icon}" style="color:${c.color}"></i> <span>${c.name}</span></div>`;
+            });
+            return div;
+        };
+        legendControl.addTo(map);
+
+
+        // ====== 4. GeoJSON 資料與圖層渲染 ======
+        var activeMarkerElement = null;
+
+        function getCategoryStyle(type1) {
+            if (type1 === '礦業遺構') return { color: '#57534e', icon: 'fa-helmet-safety' };
+            if (type1 === '公眾信仰') return { color: '#dc2626', icon: 'fa-vihara' };
+            if (type1 === '公共建設') return { color: '#0284c7', icon: 'fa-train' };
+            if (type1 === '文化資源') return { color: '#16a34a', icon: 'fa-tree-city' };
+            if (type1 === '常民生活') return { color: '#ea580c', icon: 'fa-store' };
+            return { color: '#64748b', icon: 'fa-location-dot' };
+        }
+
+        // ==========================================
+        // 核心資料庫 (從樹林組完整Geojson檔案.csv 自動轉譯生成)
+        // ==========================================
+        var geojsonData = {
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "大豐煤礦二號坑台車路線",
+        "type1": "礦業遺構",
+        "desc": "由鍾心怡所完成之臺北縣縣定古蹟山佳車站調查研究及修復計畫中所載，是山佳地區少見的煤礦台車軌道路線。",
+        "story": "大豐煤礦二號坑在全盛時期，是整個山仔腳地區產量最高的重要礦坑。礦工們在狹窄危險的地底將煤炭採出後，便是仰賴台車與輕便軌道將這些「黑金」源源不絕地送出坑外。沿著台車軌道，從二號坑（包含一號坑）送出的精選煤炭，會一路被運送匯集至礦區內的「堆棧場」。這條台車路線最驚心動魄的日常故事，發生在緊鄰主線鐵路的大型露天「堆棧場（二）」。這裡是煤礦外運的最後一站，當台車將二號坑滿載的煤炭傾倒於此後，工人們便迎來了最大的挑戰：由於位置緊鄰通往山佳車站的鐵軌，工人們必須與火車進站的時間賽跑。每當火車到來，在喧囂的汽笛聲與四處瀰漫的煤煙中，他們必須以最快的速度進行繁重的裝載作業，確保這些黑金能順利發車、運往全台各地。",
+        "type2": "台車路線",
+        "era": "1960s",
+        "site": "樹林",
+        "url": "",
+        "video": "",
+        "stage": "",
+        "出處": "引用自鍾心怡，《臺北縣縣定古蹟山佳車站調查研究及修復計畫》",
+        "pic01_url": "",
+        "pic01_desc": "",
+        "pic01_grapher": "",
+        "pic01_courtesy": "",
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            121.386618,
+            24.9742
+          ],
+          [
+            121.386831,
+            24.973989
+          ],
+          [
+            121.38712,
+            24.973616
+          ],
+          [
+            121.38734,
+            24.973471
+          ],
+          [
+            121.387445,
+            24.97344
+          ],
+          [
+            121.387549,
+            24.973435
+          ],
+          [
+            121.38765,
+            24.973424
+          ],
+          [
+            121.387752,
+            24.973396
+          ],
+          [
+            121.387871,
+            24.973358
+          ],
+          [
+            121.388001,
+            24.973343
+          ],
+          [
+            121.388259,
+            24.973339
+          ],
+          [
+            121.389307,
+            24.973318
+          ],
+          [
+            121.3895,
+            24.973212
+          ],
+          [
+            121.3897,
+            24.973132
+          ],
+          [
+            121.390062,
+            24.973021
+          ],
+          [
+            121.390254,
+            24.972984
+          ],
+          [
+            121.390445,
+            24.972939
+          ],
+          [
+            121.390713,
+            24.972778
+          ],
+          [
+            121.391544,
+            24.972518
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          121.386618,
+          24.9742
+        ]
+      },
+      "properties": {
+        "name": "大豐煤礦二號坑口",
+        "type1": "礦業遺構",
+        "type2": "坑口",
+        "desc": "這裡是清代開採、日治時期興盛的煤礦遺址，曾為山仔腳地區產量最高的重要礦坑。現場保留礦坑口、軌道、礦車與礦工模型，並設有小型文物館，重現昔日採礦生活。雖礦坑已封閉，但仍可從現地展示與環境感受當年礦工艱辛與地方煤礦文化的發展。",
+        "story": "大豐二號坑的發展可追溯至清朝同治年間，當時因煤礦品質優良、產量豐富，逐漸成為山仔腳地區最重要的礦坑之一。到了日治時期，隨著戰爭對能源需求的增加，蓋淡坑的開採規模進一步擴大，吸引大量礦工進駐，全盛時期曾有上千人於此工作，也帶動周邊聚落的形成與繁榮，山佳因此發展成為熱鬧的煤礦山城，並促成山仔腳驛（今山佳車站）的設立，形成礦業與交通相互支撐的發展脈絡。 礦區內分為大豐一號坑與二號坑，其中二號坑為主要產區，年產量曾高達數萬公噸，為地方經濟的重要支柱。礦工的日常生活充滿艱辛與危險，長時間在狹窄、潮濕的坑道中工作，仰賴簡單工具與彼此合作維持生計；而一旁的蓋淡福德宮，則成為礦工寄託信仰、祈求平安的重要場所，反映出礦業發展與地方信仰緊密交織的生活樣貌。 隨著時代變遷與能源結構轉型，煤礦產業逐漸沒落，蓋淡坑亦於民國四十八年封坑，昔日繁盛的礦業景象隨之消退。如今礦坑本體多已坍塌，僅存經整修後的坑口、軌道與展示設施，以及小型煤礦文物館，透過實物與圖文保存礦工記憶。從過去的礦業重鎮到今日的歷史遺址，蓋淡坑見證了山佳地區產業興衰與空間轉變，也成為理解臺灣北部煤礦文化的重要場域。 蓋淡坑自清同治年間開採，因煤質優良而發展為山仔腳地區最重要的煤礦中心。日治時期隨著產量攀升至巔峰，不僅吸引千人移居，更促成山佳車站的設立與山城的繁榮。礦工在艱險坑道中相互扶持，並透過鄰近的福德宮祈求平安，展現出產業與信仰緊密交織的在地生活。隨著民國四十八年正式封坑，這段「黑金」歲月因能源轉型而逐漸消退，僅存部分遺跡與軌道供後人懷念。如今遺址已轉型為文物館，透過保存的坑口與圖文紀錄，持續見證著北台灣煤礦文化的興衰變遷。",
+        "era": "同治年間至民國48年",
+        "site": "樹林",
+        "url": "",
+        "出處": "引用自張偉郎，《海山地區煤礦業遺址調查報告》",
+        "video": "",
+        "stage": "",
+        "pic01_url": "https://drive.google.com/thumbnail?id=1l32e6XKCziSQptAVT41bh1Y-MmrCbAZQ&sz=w2000",
+        "pic01_desc": "二號坑全景",
+        "pic01_grapher": "",
+        "pic01_courtesy": "高子超提供，拍攝於2026/05/19",
+        "pic02_url": "https://drive.google.com/thumbnail?id=1CeJR0wMt6JcZFCRqnOagMcSlJS1QhvLb&sz=w2000",
+        "pic02_desc": "蓋淡坑史志碑文",
+        "pic02_grapher": "",
+        "pic02_courtesy": "黃勇翔提供，拍攝於2026/05/11",
+        "pic03_url": "https://drive.google.com/thumbnail?id=1v5vO6nsNsZAVs3suvH9ugwrxXp9Vs_pS&sz=w2000",
+        "pic03_desc": "工寮改建之煤礦文物紀念館（非常態開放）",
+        "pic03_grapher": "",
+        "pic03_courtesy": "黃勇翔提供，拍攝於2026/05/11",
+        "pic04_url": "https://drive.google.com/thumbnail?id=1Ul5-ylGd2qXq5c45n5obUbfVDgpKwo2u&sz=w2000",
+        "pic04_desc": "二號坑坑口",
+        "pic04_grapher": "",
+        "pic04_courtesy": "黃勇翔提供，拍攝於2026/05/11",
+        "pic05_url": "https://drive.google.com/thumbnail?id=1O6e4yHURuzd53MhVwVA57pnkocXMGz0m&sz=w2000",
+        "pic05_desc": "二號坑旁步道",
+        "pic05_grapher": "",
+        "pic05_courtesy": "黃勇翔提供，拍攝於2026/05/11",
+        "pic06_url": "https://drive.google.com/thumbnail?id=1oWXY0SgL3C_BeGEjk3eqoAqoC-ei5P5M&sz=w2000",
+        "pic06_desc": "入口雕像",
+        "pic06_grapher": "",
+        "pic06_courtesy": "黃勇翔提供，拍攝於2026/05/11",
+        "pic07_url": "https://drive.google.com/thumbnail?id=1tFT6U9CXhKaALyR99DE8OOkQewMzhGkx&sz=w2000",
+        "pic07_desc": "二號坑坑內意象（一）",
+        "pic07_grapher": "",
+        "pic07_courtesy": "黃勇翔提供，拍攝於2026/05/11",
+        "pic08_url": "https://drive.google.com/thumbnail?id=17PgMCduzIoRBJ-fcrf8gyeKYA1mmqwpi&sz=w2000",
+        "pic08_desc": "二號坑坑內意象（二）",
+        "pic08_grapher": "",
+        "pic08_courtesy": "高子超提供，拍攝於2026/05/19",
+        "pic09_url": "https://drive.google.com/thumbnail?id=1wUI4cVhfRbhdHhER3XVIm-_ibyIxozSL&sz=w2000",
+        "pic09_desc": "二號坑外雕像",
+        "pic09_grapher": "",
+        "pic09_courtesy": "黃勇翔提供，拍攝於2026/05/11",
+        "podcast_url": "https://dl.dropboxusercontent.com/scl/fi/gy1a9enyyvlz7lzxewgd0/.mp3?rlkey=yk85dy23b17gx5e59yblzs3zd&st=eacvqfnp&dl=0",
+        "podcast_start": 620
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          121.392119,
+          24.973772
+        ]
+      },
+      "properties": {
+        "name": "大豐煤礦一號坑口",
+        "type1": "礦業遺構",
+        "type2": "坑口",
+        "desc": "這裡為日治時期設立的煤礦坑，擁有超過八十年的開採歷史，曾是山佳地區重要的礦業據點之一。現場保留紅磚拱形坑口與礦工意象裝置，呈現當年礦工艱辛作業的情景。封坑後坑內積水，曾被用作洗衣場所，如今則成為隱身山林中的歷史遺址，帶有靜謐且略帶滄桑的氛圍。",
+        "story": "大豐一號坑起源於1899年，歷經多次更名與轉手，是見證樹林山佳地區百年「黑金歲月」的重要煤礦遺址。全盛時期作為臺北盆地的產煤重鎮，礦區透過輕便軌道直通山佳車站，成為支撐當地生計與經濟發展的命脈。直到1984年受限於開採成本與能源政策轉向，這座支撐百年的礦坑才正式走入歷史。封坑後，坑內湧出的清澈泉水意外化作居民的天然洗衣場，為冰冷的工業遺構注入溫暖的常民生活記憶。如今殘存的坑口依然靜默矗立於山林間，守護著這段從興盛到轉型的在地文化傳奇。",
+        "era": "1899(礦權設立)~1984",
+        "site": "樹林",
+        "url": "",
+        "出處": "引用自張偉郎，《海山地區煤礦業遺址調查報告》",
+        "video": "",
+        "stage": "",
+        "pic01_url": "https://drive.google.com/thumbnail?id=1aOJl-CKe2sBPj8sdRO8NI2m_9vwc1Qch&sz=w2000",
+        "pic01_desc": "一號坑口聚落",
+        "pic01_grapher": "",
+        "pic01_courtesy": "陳柏宇提供，拍攝於2026/04/18",
+        "pic02_url": "",
+        "pic02_desc": "",
+        "pic02_grapher": "",
+        "pic02_courtesy": "",
+        "pic03_url": "",
+        "pic03_desc": "",
+        "pic03_grapher": "",
+        "pic03_courtesy": "",
+        "pic04_url": "",
+        "pic04_desc": "",
+        "pic04_grapher": "",
+        "pic04_courtesy": "",
+        "pic05_url": "",
+        "pic05_desc": "",
+        "pic05_grapher": "",
+        "pic05_courtesy": "",
+        "pic06_url": "",
+        "pic06_desc": "",
+        "pic06_grapher": "",
+        "pic06_courtesy": "",
+        "pic07_url": "",
+        "pic07_desc": "",
+        "pic07_grapher": "",
+        "pic07_courtesy": "",
+        "pic08_url": "",
+        "pic08_desc": "",
+        "pic08_grapher": "",
+        "pic08_courtesy": "",
+        "pic09_url": "",
+        "pic09_desc": "",
+        "pic09_grapher": "",
+        "pic09_courtesy": "",
+        "podcast_url": "https://dl.dropboxusercontent.com/scl/fi/gy1a9enyyvlz7lzxewgd0/.mp3?rlkey=yk85dy23b17gx5e59yblzs3zd&st=eacvqfnp&dl=0",
+        "podcast_start": 145
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          121.392814,
+          24.972594
+        ]
+      },
+      "properties": {
+        "name": "山佳舊車站",
+        "type1": "公共建設",
+        "type2": "車站",
+        "desc": "這是一座兼具歷史與現代特色的鐵道車站，最大特色為百年舊站與新站並存，展現新舊融合的獨特風貌。舊站房保留日治時期建築風格與洗石子外牆，見證早年煤礦運輸的發展歷史。周邊串聯鐵道公園與煤礦遺址，整體環境清幽，是結合文化與散步的特色景點。",
+        "story": "山佳車站自1901年設站，是北臺灣唯一保存至今的二戰前日治時期車站建築，在鐵路史上具有獨特地位。早期作為煤礦運輸的核心，它曾擔負年產兩萬五千公噸「黑金」的重任，與大豐一、二號坑共同支撐起當地的產業命脈。隨著礦業沒落，車站於1962年正式更名為「山佳」，從沉重的貨運轉型為載客，守護著往返旅客的日常。如今這座古蹟車站不僅是通往歷史礦坑遺址的入口，也成為旅人探索百年煤礦風華的起點。來到這裡，遊客能在古色古香的站體中感受時光交錯，並順遊鄰近的大凍山步道，享受兼具歷史與山林的清幽之旅。",
+        "era": "1903年(日治時期)",
+        "site": "樹林",
+        "url": "",
+        "出處": "引用自鍾心怡，《臺北縣縣定古蹟山佳車站調查研究及修復計畫》",
+        "video": "",
+        "stage": "",
+        "pic01_url": "https://drive.google.com/thumbnail?id=1COe0gW5_5EgLfKr703BvD1ONpS-_uej_&sz=w2000",
+        "pic01_desc": "山佳舊車站正面",
+        "pic01_grapher": "",
+        "pic01_courtesy": "陳柏宇提供，拍攝於2026/04/18",
+        "pic02_url": "",
+        "pic02_desc": "",
+        "pic02_grapher": "",
+        "pic02_courtesy": "",
+        "pic03_url": "",
+        "pic03_desc": "",
+        "pic03_grapher": "",
+        "pic03_courtesy": "",
+        "pic04_url": "",
+        "pic04_desc": "",
+        "pic04_grapher": "",
+        "pic04_courtesy": "",
+        "pic05_url": "",
+        "pic05_desc": "",
+        "pic05_grapher": "",
+        "pic05_courtesy": "",
+        "pic06_url": "",
+        "pic06_desc": "",
+        "pic06_grapher": "",
+        "pic06_courtesy": "",
+        "pic07_url": "",
+        "pic07_desc": "",
+        "pic07_grapher": "",
+        "pic07_courtesy": "",
+        "pic08_url": "",
+        "pic08_desc": "",
+        "pic08_grapher": "",
+        "pic08_courtesy": "",
+        "pic09_url": "",
+        "pic09_desc": "",
+        "pic09_grapher": "",
+        "pic09_courtesy": "",
+        "podcast_url": "https://dl.dropboxusercontent.com/scl/fi/gy1a9enyyvlz7lzxewgd0/.mp3?rlkey=yk85dy23b17gx5e59yblzs3zd&st=eacvqfnp&dl=0",
+        "podcast_start": 90
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          121.3958,
+          24.9731
+        ]
+      },
+      "properties": {
+        "name": "山佳鐵道地景公園",
+        "type1": "文化資源",
+        "type2": "人文地景",
+        "desc": "山加鐵路地景公園位於山佳火車站旁邊，是一座結合鐵路與煤礦業的公園，展現了山佳地區發展的歷程，山佳鐵路地景公園和緊鄰之山佳彩繪街一同見證了山佳地區過往的樣貌以及產業沒落後的轉型。",
+        "story": "山佳鐵路地景公園建立於2009年，當年鐵路局對該地區的鐵路路線進行截彎取直，在原先軌道旁開鑿隧道做為新路線，而原先鐵路經過的地區則規劃成地景公園，2017年時在園區內放置了煤斗車跟調動機，更加完整的呈現山佳過往鐵路和煤礦業的關係。",
+        "era": "現代",
+        "site": "樹林",
+        "url": "",
+        "出處": null,
+        "pic01_url": "https://drive.google.com/thumbnail?id=1yXZf7ZIQ1dnIm7QWrJ4rmxTANuCEM7rz&sz=w2000",
+        "pic01_desc": "入口處「愛」意象設施",
+        "pic01_grapher": "",
+        "pic01_courtesy": "陳柏宇提供，拍攝於2026/04/18",
+        "pic02_url": "https://drive.google.com/thumbnail?id=1tRRAzL7kXMVgo615_rIs5EHEHrfZDoSf&sz=w2000",
+        "pic02_desc": "煤斗車與調動機",
+        "pic02_grapher": "",
+        "pic02_courtesy": "陳柏宇提供，拍攝於2026/04/18",
+        "pic03_url": "",
+        "pic03_desc": "",
+        "pic03_grapher": "",
+        "pic03_courtesy": "",
+        "pic04_url": "",
+        "pic04_desc": "",
+        "pic04_grapher": "",
+        "pic04_courtesy": "",
+        "pic05_url": "",
+        "pic05_desc": "",
+        "pic05_grapher": "",
+        "pic05_courtesy": "",
+        "pic06_url": "",
+        "pic06_desc": "",
+        "pic06_grapher": "",
+        "pic06_courtesy": "",
+        "pic07_url": "",
+        "pic07_desc": "",
+        "pic07_grapher": "",
+        "pic07_courtesy": "",
+        "pic08_url": "",
+        "pic08_desc": "",
+        "pic08_grapher": "",
+        "pic08_courtesy": "",
+        "pic09_url": "",
+        "pic09_desc": "",
+        "pic09_grapher": "",
+        "pic09_courtesy": "",
+        "podcast_url": "https://dl.dropboxusercontent.com/scl/fi/gy1a9enyyvlz7lzxewgd0/.mp3?rlkey=yk85dy23b17gx5e59yblzs3zd&st=eacvqfnp&dl=0",
+        "podcast_start": 680
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          121.401093,
+          24.9757
+        ]
+      },
+      "properties": {
+        "name": "泰興宮",
+        "type1": "公眾信仰",
+        "type2": "土地公",
+        "desc": "這是一間位於山佳火車站北邊聚落的土地公廟，山佳地區過往煤礦業興盛，作為保佑平安的土地公廟也散布於各聚落，泰興宮就是福德街一帶祭祀的土地公廟，自建廟以來已滿百年。",
+        "story": "現今的泰興宮為第二代廟，第一代廟建立於1926年，由余乞食信士（大豐碳礦第六任礦主）捐款所建，爾後因原本廟體之磚瓦木材歷經多年消耗導致結構受損，遂募資建設第二代廟，並於1996年完成，是為現今所見之廟體。",
+        "era": "現代",
+        "site": "樹林",
+        "url": "",
+        "出處": null,
+        "pic01_url": "https://drive.google.com/thumbnail?id=1fqpNpq1C6YLrM5WIM9-g3JHuh-Sjk3g8&sz=w2000",
+        "pic01_desc": "泰興宮廟埕",
+        "pic01_grapher": "",
+        "pic01_courtesy": "陳柏宇提供，拍攝於2026/04/18",
+        "pic02_url": "",
+        "pic02_desc": "",
+        "pic02_grapher": "",
+        "pic02_courtesy": "",
+        "pic03_url": "",
+        "pic03_desc": "",
+        "pic03_grapher": "",
+        "pic03_courtesy": "",
+        "pic04_url": "",
+        "pic04_desc": "",
+        "pic04_grapher": "",
+        "pic04_courtesy": "",
+        "pic05_url": "",
+        "pic05_desc": "",
+        "pic05_grapher": "",
+        "pic05_courtesy": "",
+        "pic06_url": "",
+        "pic06_desc": "",
+        "pic06_grapher": "",
+        "pic06_courtesy": "",
+        "pic07_url": "",
+        "pic07_desc": "",
+        "pic07_grapher": "",
+        "pic07_courtesy": "",
+        "pic08_url": "",
+        "pic08_desc": "",
+        "pic08_grapher": "",
+        "pic08_courtesy": "",
+        "pic09_url": "",
+        "pic09_desc": "",
+        "pic09_grapher": "",
+        "pic09_courtesy": "",
+        "podcast_url": "https://dl.dropboxusercontent.com/scl/fi/gy1a9enyyvlz7lzxewgd0/.mp3?rlkey=yk85dy23b17gx5e59yblzs3zd&st=eacvqfnp&dl=0",
+        "podcast_start": 910
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          121.40185,
+          24.975509
+        ]
+      },
+      "properties": {
+        "name": "山佳國小",
+        "type1": "常民生活",
+        "type2": "學校",
+        "desc": "山佳國小是山佳地區歷史最悠久的小學，建校至今已過百年，至今仍承擔著山佳地區基礎教育的任務。",
+        "story": "山佳國小的前身可追溯至1920年的樹林公學校山子腳分離教室，爾後在1923年成為山子腳分教場，1930年升格為山子腳公學校，在戰後則改名為山佳國民學校，現今則為樹林區山佳國民小學。山佳國小自山子腳分離教室起算至今已過百年，見證了無數山佳人的成長歷程，也見證了山佳地區煤礦業的興盛與衰弱。",
+        "era": "日治",
+        "site": "樹林",
+        "url": "",
+        "出處": null,
+        "pic01_url": "https://drive.google.com/thumbnail?id=1CFkwEeP0XCqoRwzx_PE3UkkIzLjZaGvF&sz=w2000",
+        "pic01_desc": "山佳國小正門",
+        "pic01_grapher": "",
+        "pic01_courtesy": "高子超提供，拍攝於2026/04/18",
+        "pic02_url": "",
+        "pic02_desc": "",
+        "pic02_grapher": "",
+        "pic02_courtesy": "",
+        "pic03_url": "",
+        "pic03_desc": "",
+        "pic03_grapher": "",
+        "pic03_courtesy": "",
+        "pic04_url": "",
+        "pic04_desc": "",
+        "pic04_grapher": "",
+        "pic04_courtesy": "",
+        "pic05_url": "",
+        "pic05_desc": "",
+        "pic05_grapher": "",
+        "pic05_courtesy": "",
+        "pic06_url": "",
+        "pic06_desc": "",
+        "pic06_grapher": "",
+        "pic06_courtesy": "",
+        "pic07_url": "",
+        "pic07_desc": "",
+        "pic07_grapher": "",
+        "pic07_courtesy": "",
+        "pic08_url": "",
+        "pic08_desc": "",
+        "pic08_grapher": "",
+        "pic08_courtesy": "",
+        "pic09_url": "",
+        "pic09_desc": "",
+        "pic09_grapher": "",
+        "pic09_courtesy": "",
+        "podcast_url": "https://dl.dropboxusercontent.com/scl/fi/gy1a9enyyvlz7lzxewgd0/.mp3?rlkey=yk85dy23b17gx5e59yblzs3zd&st=eacvqfnp&dl=0",
+        "podcast_start": 610
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          121.391443,
+          24.973243
+        ]
+      },
+      "properties": {
+        "name": "大豐煤礦礦務所",
+        "type1": "礦業遺構",
+        "type2": "礦務所",
+        "desc": "昔日礦區的行政管理中心，功能類似現代辦公室，負責監督採煤進度與發放工資。",
+        "story": "礦務所是礦場的「大腦」，也是礦工們生計的守護者。在那個全速開採的年代，算盤的敲擊聲與報表翻動的聲響在此起彼落。每到發薪日，辦公室前便充滿了人潮，礦工們洗去臉上的煤灰，領取這份用汗水換來的酬勞。這裡紀錄了山佳煤礦產業的鼎盛與興衰，每一張報表背後都是一個家庭的辛勞與期盼。",
+        "era": "1960s",
+        "site": "樹林",
+        "url": "",
+        "出處": "引用自鍾心怡，《臺北縣縣定古蹟山佳車站調查研究及修復計畫》",
+        "video": "",
+        "stage": "",
+        "pic01_url": "https://drive.google.com/thumbnail?id=1tTX1mCwjbYAcMUjWK9d3_UKt4LovDBY0&sz=w2000",
+        "pic01_desc": "礦務所現狀",
+        "pic01_grapher": "",
+        "pic01_courtesy": "陳柏宇提供，拍攝於2026/04/18",
+        "pic02_url": "",
+        "pic02_desc": "",
+        "pic02_grapher": "",
+        "pic02_courtesy": "",
+        "pic03_url": "",
+        "pic03_desc": "",
+        "pic03_grapher": "",
+        "pic03_courtesy": "",
+        "pic04_url": "",
+        "pic04_desc": "",
+        "pic04_grapher": "",
+        "pic04_courtesy": "",
+        "pic05_url": "",
+        "pic05_desc": "",
+        "pic05_grapher": "",
+        "pic05_courtesy": "",
+        "pic06_url": "",
+        "pic06_desc": "",
+        "pic06_grapher": "",
+        "pic06_courtesy": "",
+        "pic07_url": "",
+        "pic07_desc": "",
+        "pic07_grapher": "",
+        "pic07_courtesy": "",
+        "pic08_url": "",
+        "pic08_desc": "",
+        "pic08_grapher": "",
+        "pic08_courtesy": "",
+        "pic09_url": "",
+        "pic09_desc": "",
+        "pic09_grapher": "",
+        "pic09_courtesy": "",
+        "podcast_url": "https://dl.dropboxusercontent.com/scl/fi/gy1a9enyyvlz7lzxewgd0/.mp3?rlkey=yk85dy23b17gx5e59yblzs3zd&st=eacvqfnp&dl=0",
+        "podcast_start": 375
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          121.388608,
+          24.973512
+        ]
+      },
+      "properties": {
+        "name": "永通福德宮",
+        "type1": "公眾信仰",
+        "type2": "土地公",
+        "desc": "為永通公司水塔改建，堆棧場遺址旁",
+        "story": "永通福德宮屬於現代所建立的公眾信仰廟宇，其最特別之處在於，它並非傳統建制，而是由「永通公司」的水塔所改建而成。這座廟宇的地理位置緊鄰著早期的煤礦「堆棧場」遺址。該地點過去是專門用來堆放煤炭的堆棧場，隨著礦業沒落與時代變遷，原址後來變成了永通公司與一般民宅的所在地，現今現場依然存留一棟永通公司的廢棄建物。雖然資料對它的描述較為簡略，但永通福德宮從煤礦堆棧場旁的地景、永通公司的工業水塔，最終轉變為庇佑在地居民的土地公廟，這個過程本身就默默見證了山佳地區產業空間的轉換",
+        "era": "現代",
+        "site": "樹林",
+        "url": "",
+        "出處": null,
+        "pic01_url": "https://drive.google.com/thumbnail?id=1dg9qXsSJK85EHEh8TPz3jircI6AusVWD&sz=w2000",
+        "pic01_desc": "永通福德宮全景",
+        "pic01_grapher": "",
+        "pic01_courtesy": "高子超提供，拍攝於2026/05/19",
+        "pic02_url": "",
+        "pic02_desc": "",
+        "pic02_grapher": "",
+        "pic02_courtesy": "",
+        "pic03_url": "",
+        "pic03_desc": "",
+        "pic03_grapher": "",
+        "pic03_courtesy": "",
+        "pic04_url": "",
+        "pic04_desc": "",
+        "pic04_grapher": "",
+        "pic04_courtesy": "",
+        "pic05_url": "",
+        "pic05_desc": "",
+        "pic05_grapher": "",
+        "pic05_courtesy": "",
+        "pic06_url": "",
+        "pic06_desc": "",
+        "pic06_grapher": "",
+        "pic06_courtesy": "",
+        "pic07_url": "",
+        "pic07_desc": "",
+        "pic07_grapher": "",
+        "pic07_courtesy": "",
+        "pic08_url": "",
+        "pic08_desc": "",
+        "pic08_grapher": "",
+        "pic08_courtesy": "",
+        "pic09_url": "",
+        "pic09_desc": "",
+        "pic09_grapher": "",
+        "pic09_courtesy": "",
+        "podcast_url": "https://dl.dropboxusercontent.com/scl/fi/gy1a9enyyvlz7lzxewgd0/.mp3?rlkey=yk85dy23b17gx5e59yblzs3zd&st=eacvqfnp&dl=0",
+        "podcast_start": 0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          121.386831,
+          24.973989
+        ]
+      },
+      "properties": {
+        "name": "蓋淡福德宮",
+        "type1": "公眾信仰",
+        "type2": "土地公",
+        "desc": "現有香爐與金爐一座，入口有一對石獅",
+        "story": "礦工下坑前都會拜，是所謂寄命的所在。礦工將生命寄放在土地公廟，祈禱下坑工作平安，上坑後再向土地公取回。",
+        "era": "1960s",
+        "site": "樹林",
+        "url": "",
+        "出處": null,
+        "pic01_url": "https://drive.google.com/thumbnail?id=1tltP2zZ1ozOdJXMBrKfLqKNjYCKsRhee&sz=w2000",
+        "pic01_desc": "蓋淡福德坑全景",
+        "pic01_grapher": "",
+        "pic01_courtesy": "高子超提供，拍攝於2026/05/19",
+        "pic02_url": "",
+        "pic02_desc": "",
+        "pic02_grapher": "",
+        "pic02_courtesy": "",
+        "pic03_url": "",
+        "pic03_desc": "",
+        "pic03_grapher": "",
+        "pic03_courtesy": "",
+        "pic04_url": "",
+        "pic04_desc": "",
+        "pic04_grapher": "",
+        "pic04_courtesy": "",
+        "pic05_url": "",
+        "pic05_desc": "",
+        "pic05_grapher": "",
+        "pic05_courtesy": "",
+        "pic06_url": "",
+        "pic06_desc": "",
+        "pic06_grapher": "",
+        "pic06_courtesy": "",
+        "pic07_url": "",
+        "pic07_desc": "",
+        "pic07_grapher": "",
+        "pic07_courtesy": "",
+        "pic08_url": "",
+        "pic08_desc": "",
+        "pic08_grapher": "",
+        "pic08_courtesy": "",
+        "pic09_url": "",
+        "pic09_desc": "",
+        "pic09_grapher": "",
+        "pic09_courtesy": "",
+        "podcast_url": "https://dl.dropboxusercontent.com/scl/fi/gy1a9enyyvlz7lzxewgd0/.mp3?rlkey=yk85dy23b17gx5e59yblzs3zd&st=eacvqfnp&dl=0",
+        "podcast_start": 550
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          121.39205,
+          24.973604
+        ]
+      },
+      "properties": {
+        "name": "大豐煤礦木工廠",
+        "type1": "礦業遺構",
+        "type2": "建物",
+        "desc": "做木工的所在，應為工具修理的場所",
+        "story": "煤礦開採極度仰賴木料支撐坑道安全。木工廠是礦場的重要後勤，師傅們在此將一根根相思木加工成支撐地底深處的「牛條」。除了結構支撐，這裡也負責修造採礦用的木製工具與車體配件。木工敲打與鋸切的聲響，曾是礦區日常律動的一部分，確保了每一寸深入地底的腳步都能獲得穩固的守護。",
+        "era": "1960s",
+        "site": "樹林",
+        "url": "",
+        "出處": "引用自鍾心怡，《臺北縣縣定古蹟山佳車站調查研究及修復計畫》",
+        "video": "",
+        "stage": "",
+        "pic01_url": "https://drive.google.com/thumbnail?id=1Kw2NuMl29z3a6EyXzfpvkw0tMURE5Zuf&sz=w2000",
+        "pic01_desc": "屋頂與牆壁多已鐵皮遮蔽，改建幅度大，仍保留正面紅磚牆",
+        "pic01_grapher": "",
+        "pic01_courtesy": "高子超提供，拍攝於2026/05/19",
+        "pic02_url": "",
+        "pic02_desc": "",
+        "pic02_grapher": "",
+        "pic02_courtesy": "",
+        "pic03_url": "",
+        "pic03_desc": "",
+        "pic03_grapher": "",
+        "pic03_courtesy": "",
+        "pic04_url": "",
+        "pic04_desc": "",
+        "pic04_grapher": "",
+        "pic04_courtesy": "",
+        "pic05_url": "",
+        "pic05_desc": "",
+        "pic05_grapher": "",
+        "pic05_courtesy": "",
+        "pic06_url": "",
+        "pic06_desc": "",
+        "pic06_grapher": "",
+        "pic06_courtesy": "",
+        "pic07_url": "",
+        "pic07_desc": "",
+        "pic07_grapher": "",
+        "pic07_courtesy": "",
+        "pic08_url": "",
+        "pic08_desc": "",
+        "pic08_grapher": "",
+        "pic08_courtesy": "",
+        "pic09_url": "",
+        "pic09_desc": "",
+        "pic09_grapher": "",
+        "pic09_courtesy": "",
+        "podcast_url": "https://dl.dropboxusercontent.com/scl/fi/gy1a9enyyvlz7lzxewgd0/.mp3?rlkey=yk85dy23b17gx5e59yblzs3zd&st=eacvqfnp&dl=0",
+        "podcast_start": 220
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          121.392174,
+          24.973842
+        ]
+      },
+      "properties": {
+        "name": "大豐煤礦修理室",
+        "type1": "礦業遺構",
+        "type2": "建物",
+        "desc": "原為紅磚屋，目前部分已改建為鐵皮屋",
+        "story": "修理室是維繫礦場機械運行的心臟地帶。在資源稀缺的年代，損壞的機具與礦工燈鮮少直接丟棄，而是送到此處由師傅悉心修復。這裡曾充滿了機油味與金屬碰撞聲，師傅們在昏暗的燈火下拆解、清洗與組裝，確保每一盞入坑的燈火都能持續照明，每一部機台都能穩定運轉。這裡見證了礦場物盡其用的克難精神，以及工藝技術代代傳承的厚度。",
+        "era": "1960s",
+        "site": "樹林",
+        "url": "",
+        "出處": "引用自鍾心怡，《臺北縣縣定古蹟山佳車站調查研究及修復計畫》",
+        "video": "",
+        "stage": "",
+        "pic01_url": "https://drive.google.com/thumbnail?id=1wDWyKRsZ9W3j_ynme--t2pXlrXSoFKja&sz=w2000",
+        "pic01_desc": "部分牆體滅失，改以鐵皮屋遮蔽，現為民宅兼營卡啦OK",
+        "pic01_grapher": "",
+        "pic01_courtesy": "高子超提供，拍攝於2026/05/19",
+        "pic02_url": "",
+        "pic02_desc": "",
+        "pic02_grapher": "",
+        "pic02_courtesy": "",
+        "pic03_url": "",
+        "pic03_desc": "",
+        "pic03_grapher": "",
+        "pic03_courtesy": "",
+        "pic04_url": "",
+        "pic04_desc": "",
+        "pic04_grapher": "",
+        "pic04_courtesy": "",
+        "pic05_url": "",
+        "pic05_desc": "",
+        "pic05_grapher": "",
+        "pic05_courtesy": "",
+        "pic06_url": "",
+        "pic06_desc": "",
+        "pic06_grapher": "",
+        "pic06_courtesy": "",
+        "pic07_url": "",
+        "pic07_desc": "",
+        "pic07_grapher": "",
+        "pic07_courtesy": "",
+        "pic08_url": "",
+        "pic08_desc": "",
+        "pic08_grapher": "",
+        "pic08_courtesy": "",
+        "pic09_url": "",
+        "pic09_desc": "",
+        "pic09_grapher": "",
+        "pic09_courtesy": "",
+        "podcast_url": "https://dl.dropboxusercontent.com/scl/fi/gy1a9enyyvlz7lzxewgd0/.mp3?rlkey=yk85dy23b17gx5e59yblzs3zd&st=eacvqfnp&dl=0",
+        "podcast_start": 334
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          121.392016,
+          24.973448
+        ]
+      },
+      "properties": {
+        "name": "大豐煤礦理髮廳",
+        "type1": "礦業遺構",
+        "type2": "建物",
+        "desc": "當時的理髮廳，現為民宅兼營推拿整復",
+        "story": "這裡曾是礦區最有人情味的社交據點。長年在暗無天日的地底工作後，理髮廳溫暖的燈火與老師傅熟練的手藝，是礦工們最珍貴的放鬆慰藉。理髮椅上流傳著各坑道的採礦消息與鄰里間的趣聞，剪刀的喀嚓聲交織著鄉親們的談笑聲。即便現今功能已轉變，那份緊密的鄰里互動與服務精神，仍如同老屋的紅磚般，深刻地烙印在老街居民的記憶裡。",
+        "era": "1960s",
+        "site": "樹林",
+        "url": "",
+        "出處": "引用自鍾心怡，《臺北縣縣定古蹟山佳車站調查研究及修復計畫》",
+        "video": "",
+        "stage": "",
+        "pic01_url": "https://drive.google.com/thumbnail?id=1vnBIWH1qlkHQFVpfLpFpuQCwkATr_zw_&sz=w2000",
+        "pic01_desc": "屋頂改以鐵皮遮蔽，門窗的原材質仍有保留",
+        "pic01_grapher": "",
+        "pic01_courtesy": "高子超提供，拍攝於2026/05/19",
+        "pic02_url": "",
+        "pic02_desc": "",
+        "pic02_grapher": "",
+        "pic02_courtesy": "",
+        "pic03_url": "",
+        "pic03_desc": "",
+        "pic03_grapher": "",
+        "pic03_courtesy": "",
+        "pic04_url": "",
+        "pic04_desc": "",
+        "pic04_grapher": "",
+        "pic04_courtesy": "",
+        "pic05_url": "",
+        "pic05_desc": "",
+        "pic05_grapher": "",
+        "pic05_courtesy": "",
+        "pic06_url": "",
+        "pic06_desc": "",
+        "pic06_grapher": "",
+        "pic06_courtesy": "",
+        "pic07_url": "",
+        "pic07_desc": "",
+        "pic07_grapher": "",
+        "pic07_courtesy": "",
+        "pic08_url": "",
+        "pic08_desc": "",
+        "pic08_grapher": "",
+        "pic08_courtesy": "",
+        "pic09_url": "",
+        "pic09_desc": "",
+        "pic09_grapher": "",
+        "pic09_courtesy": "",
+        "podcast_url": "https://dl.dropboxusercontent.com/scl/fi/gy1a9enyyvlz7lzxewgd0/.mp3?rlkey=yk85dy23b17gx5e59yblzs3zd&st=eacvqfnp&dl=0",
+        "podcast_start": 285
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          121.392138,
+          24.973141
+        ]
+      },
+      "properties": {
+        "name": "大豐煤礦堆棧場（一）",
+        "type1": "礦業遺構",
+        "type2": "建物",
+        "desc": "煤礦開採後的重要轉運節點，主要用於暫時存放坑口運出的原煤。場內設有篩分設備，將煤炭依品質與大小分類，以便後續裝載運往車站。",
+        "story": "昔日的大豐煤礦，每日產出的黑金皆需在此匯集。堆棧場分擔了龐大的運載量，工人們在漫天煤灰中辛勤工作，將一車車的煤炭裝載至輕便車或貨車。這裡曾是礦區最繁忙的角落，見證了山佳煤礦業最輝煌的出口歲月。",
+        "era": "1960s",
+        "site": "樹林",
+        "url": "",
+        "video": "",
+        "stage": "",
+        "出處": "引用自鍾心怡，《臺北縣縣定古蹟山佳車站調查研究及修復計畫》",
+        "pic01_url": "https://drive.google.com/thumbnail?id=1Ih8uIRaYOJQ0HqWBatZGfrvj4-zJiw07&sz=w2000",
+        "pic01_desc": "堆棧場現址",
+        "pic01_grapher": "",
+        "pic01_courtesy": "高子超提供，拍攝於2026/05/19",
+        "pic02_url": "",
+        "pic02_desc": "",
+        "pic02_grapher": "",
+        "pic02_courtesy": "",
+        "pic03_url": "",
+        "pic03_desc": "",
+        "pic03_grapher": "",
+        "pic03_courtesy": "",
+        "pic04_url": "",
+        "pic04_desc": "",
+        "pic04_grapher": "",
+        "pic04_courtesy": "",
+        "pic05_url": "",
+        "pic05_desc": "",
+        "pic05_grapher": "",
+        "pic05_courtesy": "",
+        "pic06_url": "",
+        "pic06_desc": "",
+        "pic06_grapher": "",
+        "pic06_courtesy": "",
+        "pic07_url": "",
+        "pic07_desc": "",
+        "pic07_grapher": "",
+        "pic07_courtesy": "",
+        "pic08_url": "",
+        "pic08_desc": "",
+        "pic08_grapher": "",
+        "pic08_courtesy": "",
+        "pic09_url": "",
+        "pic09_desc": "",
+        "pic09_grapher": "",
+        "pic09_courtesy": "",
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          121.391544,
+          24.972518
+        ]
+      },
+      "properties": {
+        "name": "大豐煤礦堆棧場（二）",
+        "type1": "礦業遺構",
+        "type2": "建物",
+        "desc": "位於鐵道旁的大型露天煤炭堆置場，是連接礦區運輸軌道與主線鐵路的轉運節點。此處保留了與鐵道銜接的空間結構，呈現出當時大規模運輸「黑金」的工業景觀遺構。",
+        "story": "緊鄰著通往山佳車站的鐵道，曾是煤礦外運的最後一站。在採煤的全盛時期，這裡堆滿了從一號坑、二號坑送來的精選煤，隨時準備裝上火車運往全台各地。由於靠近鐵軌，工人們必須與火車進站的時間賽跑，在喧囂的汽笛聲與漫天的煤煙中，繁忙地操作著轉運作業。這裡不僅是物資的匯集點，更是山佳經濟動力源源不絕向外輸送的起點，見證了台灣北部能源發展的關鍵環節。",
+        "era": "1960s",
+        "site": "樹林",
+        "url": "",
+        "video": "",
+        "stage": "",
+        "出處": "引用自鍾心怡，《臺北縣縣定古蹟山佳車站調查研究及修復計畫》",
+        "pic01_url": "https://lh3.googleusercontent.com/d/1zXpR2KVSysrK46XzSHQNt2y3Oa18CYm8",
+        "pic01_desc": "靠近鐵軌旁的堆棧場",
+        "pic01_grapher": "",
+        "pic01_courtesy": "高子超提供，拍攝於2026/05/19",
+        "pic02_url": "",
+        "pic02_desc": "",
+        "pic02_grapher": "",
+        "pic02_courtesy": "",
+        "pic03_url": "",
+        "pic03_desc": "",
+        "pic03_grapher": "",
+        "pic03_courtesy": "",
+        "pic04_url": "",
+        "pic04_desc": "",
+        "pic04_grapher": "",
+        "pic04_courtesy": "",
+        "pic05_url": "",
+        "pic05_desc": "",
+        "pic05_grapher": "",
+        "pic05_courtesy": "",
+        "pic06_url": "",
+        "pic06_desc": "",
+        "pic06_grapher": "",
+        "pic06_courtesy": "",
+        "pic07_url": "",
+        "pic07_desc": "",
+        "pic07_grapher": "",
+        "pic07_courtesy": "",
+        "pic08_url": "",
+        "pic08_desc": "",
+        "pic08_grapher": "",
+        "pic08_courtesy": "",
+        "pic09_url": "",
+        "pic09_desc": "",
+        "pic09_grapher": "",
+        "pic09_courtesy": "",
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          121.38843,
+          24.973469
+        ]
+      },
+      "properties": {
+        "name": "大豐煤礦堆棧場（三）",
+        "type1": "礦業遺構",
+        "type2": "建物",
+        "desc": "可能是堆煤炭的地方，現在已經變成社區，後方空地有廢棄建物一棟，可能是永通公司建物。",
+        "story": "在礦坑廢棄後土地仍維持私有，但實際已經變成永通公司與民宅所在，後方現存永通公司建物一棟",
+        "era": "1960s",
+        "site": "樹林",
+        "url": "",
+        "video": "",
+        "stage": "",
+        "出處": "引用自鍾心怡，《臺北縣縣定古蹟山佳車站調查研究及修復計畫》",
+        "pic01_url": "https://drive.google.com/thumbnail?id=18b9LeSRIweOmM3LC-eEaamO1fr9vexdu&sz=w2000",
+        "pic01_desc": "現址上方為廢棄建物一棟",
+        "pic01_grapher": "",
+        "pic01_courtesy": "高子超提供，拍攝於2026/05/19",
+        "pic02_url": "",
+        "pic02_desc": "",
+        "pic02_grapher": "",
+        "pic02_courtesy": "",
+        "pic03_url": "",
+        "pic03_desc": "",
+        "pic03_grapher": "",
+        "pic03_courtesy": "",
+        "pic04_url": "",
+        "pic04_desc": "",
+        "pic04_grapher": "",
+        "pic04_courtesy": "",
+        "pic05_url": "",
+        "pic05_desc": "",
+        "pic05_grapher": "",
+        "pic05_courtesy": "",
+        "pic06_url": "",
+        "pic06_desc": "",
+        "pic06_grapher": "",
+        "pic06_courtesy": "",
+        "pic07_url": "",
+        "pic07_desc": "",
+        "pic07_grapher": "",
+        "pic07_courtesy": "",
+        "pic08_url": "",
+        "pic08_desc": "",
+        "pic08_grapher": "",
+        "pic08_courtesy": "",
+        "pic09_url": "",
+        "pic09_desc": "",
+        "pic09_grapher": "",
+        "pic09_courtesy": "",
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          121.391617,
+          24.973287
+        ]
+      },
+      "properties": {
+        "name": "大豐煤礦炸藥倉庫",
+        "type1": "礦業遺構",
+        "type2": "建物",
+        "desc": "這曾經是一座牆體厚實的紅磚構造建物，早期專門用於存放採礦開鑿所需的炸藥與引信。如今建物雖然廢棄，但地已成為當地巡守隊與環保志工隊的駐紮基地，成為守護社區安全的場所。",
+        "story": "炸藥是煤礦開採中威力最強、也最令人敬畏的物資。為了確保礦區安全，炸藥倉庫通常被安置在遠離坑口與聚落的獨立位置，並由專人嚴格監管每一管藥劑的出入紀錄。老礦工們回憶，當年領取炸藥時的氣氛總是格外嚴肅，因為那是與地殼對抗、開闢道路的關鍵力量。幸運的是，這座倉庫在數十年的採礦歲月中，始終平安地守護著這片山林，未曾發生過任何意外。如今，這裡存放的不再是震耳欲聾的炸藥，而是志工們守護家園的熱忱，從「開礦」轉化為「環保」，見證了時代使命的溫柔轉身。",
+        "era": "1960s",
+        "site": "樹林",
+        "url": "",
+        "出處": "引用自鍾心怡，《臺北縣縣定古蹟山佳車站調查研究及修復計畫》",
+        "video": "",
+        "stage": "",
+        "pic01_url": "https://drive.google.com/thumbnail?id=1z7o4_vrcaBv5ShT5bQF7g4WMPkVOw7nS&sz=w2000",
+        "pic01_desc": "殘跡可見於隊部後方",
+        "pic01_grapher": "",
+        "pic01_courtesy": "高子超提供，拍攝於2026/05/19",
+        "pic02_url": "https://drive.google.com/thumbnail?id=1s_L8vPJZ-ATuzrHqcVr7CQWPRmiLjUoq&sz=w2000",
+        "pic02_desc": "全景",
+        "pic02_grapher": "",
+        "pic02_courtesy": "高子超提供，拍攝於2026/05/19",
+        "pic03_url": "",
+        "pic03_desc": "",
+        "pic03_grapher": "",
+        "pic03_courtesy": "",
+        "pic04_url": "",
+        "pic04_desc": "",
+        "pic04_grapher": "",
+        "pic04_courtesy": "",
+        "pic05_url": "",
+        "pic05_desc": "",
+        "pic05_grapher": "",
+        "pic05_courtesy": "",
+        "pic06_url": "",
+        "pic06_desc": "",
+        "pic06_grapher": "",
+        "pic06_courtesy": "",
+        "pic07_url": "",
+        "pic07_desc": "",
+        "pic07_grapher": "",
+        "pic07_courtesy": "",
+        "pic08_url": "",
+        "pic08_desc": "",
+        "pic08_grapher": "",
+        "pic08_courtesy": "",
+        "pic09_url": "",
+        "pic09_desc": "",
+        "pic09_grapher": "",
+        "pic09_courtesy": "",
+        "podcast_url": "https://dl.dropboxusercontent.com/scl/fi/gy1a9enyyvlz7lzxewgd0/.mp3?rlkey=yk85dy23b17gx5e59yblzs3zd&st=eacvqfnp&dl=0",
+        "podcast_start": 420
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          121.391109,
+          24.973192
+        ]
+      },
+      "properties": {
+        "name": "大豐煤礦鐵工廠",
+        "type1": "礦業遺構",
+        "type2": "建物",
+        "desc": "礦區內的核心維修基地，負責保養與修理採礦所需的各類機械設備，包括捲揚機、礦車軌道及通風設施。",
+        "story": "採礦工作極度依賴機械設備的穩定運作。鐵工廠內的師傅們憑藉精湛的手藝，在火花四濺中修復受損的礦車與機具，確保地下作業不致中斷。對於礦工而言，鐵工廠的穩定運作就是他們在幽暗坑道中安全作業的最強後盾。",
+        "era": "1960s",
+        "site": "樹林",
+        "url": "",
+        "出處": "引用自鍾心怡，《臺北縣縣定古蹟山佳車站調查研究及修復計畫》",
+        "video": "",
+        "stage": "",
+        "pic01_url": "https://drive.google.com/thumbnail?id=1dNuhfe3z9P-llt2oHlt1NO7G3LHSA3mZ&sz=w2000",
+        "pic01_desc": "現為民宅",
+        "pic01_grapher": "",
+        "pic01_courtesy": "高子超提供，拍攝於2026/05/19",
+        "pic02_url": "",
+        "pic02_desc": "",
+        "pic02_grapher": "",
+        "pic02_courtesy": "",
+        "pic03_url": "",
+        "pic03_desc": "",
+        "pic03_grapher": "",
+        "pic03_courtesy": "",
+        "pic04_url": "",
+        "pic04_desc": "",
+        "pic04_grapher": "",
+        "pic04_courtesy": "",
+        "pic05_url": "",
+        "pic05_desc": "",
+        "pic05_grapher": "",
+        "pic05_courtesy": "",
+        "pic06_url": "",
+        "pic06_desc": "",
+        "pic06_grapher": "",
+        "pic06_courtesy": "",
+        "pic07_url": "",
+        "pic07_desc": "",
+        "pic07_grapher": "",
+        "pic07_courtesy": "",
+        "pic08_url": "",
+        "pic08_desc": "",
+        "pic08_grapher": "",
+        "pic08_courtesy": "",
+        "pic09_url": "",
+        "pic09_desc": "",
+        "pic09_grapher": "",
+        "pic09_courtesy": "",
+        "podcast_url": "https://dl.dropboxusercontent.com/scl/fi/gy1a9enyyvlz7lzxewgd0/.mp3?rlkey=yk85dy23b17gx5e59yblzs3zd&st=eacvqfnp&dl=0",
+        "podcast_start": 480
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          121.391479,
+          24.97304
+        ]
+      },
+      "properties": {
+        "name": "大豐煤礦倉庫",
+        "type1": "礦業遺構",
+        "type2": "建物",
+        "desc": "用於存放採礦物資與工具的空間，包括炸藥、支撐坑道的木料（牛條）、礦工燈具及各類消耗品。",
+        "story": "倉庫是礦場的物資調度中心，管理極其嚴格。每一盞礦工燈的發放、每一根牛條的領取，都關係到坑下的作業安全。這裡不僅僅是存放物品的地方，更是整座礦場運作的後勤命脈，確保了開採工作的有序進行。",
+        "era": "1960s",
+        "site": "樹林",
+        "url": "",
+        "出處": "引用自鍾心怡，《臺北縣縣定古蹟山佳車站調查研究及修復計畫》",
+        "video": "",
+        "stage": "",
+        "pic01_url": "https://drive.google.com/thumbnail?id=1A37a3EGxsZI2huvXHAfKrB4HTtJQMPlI&sz=w2000",
+        "pic01_desc": "現為民宅",
+        "pic01_grapher": "",
+        "pic01_courtesy": "高子超提供，拍攝於2026/05/19",
+        "pic02_url": "",
+        "pic02_desc": "",
+        "pic02_grapher": "",
+        "pic02_courtesy": "",
+        "pic03_url": "",
+        "pic03_desc": "",
+        "pic03_grapher": "",
+        "pic03_courtesy": "",
+        "pic04_url": "",
+        "pic04_desc": "",
+        "pic04_grapher": "",
+        "pic04_courtesy": "",
+        "pic05_url": "",
+        "pic05_desc": "",
+        "pic05_grapher": "",
+        "pic05_courtesy": "",
+        "pic06_url": "",
+        "pic06_desc": "",
+        "pic06_grapher": "",
+        "pic06_courtesy": "",
+        "pic07_url": "",
+        "pic07_desc": "",
+        "pic07_grapher": "",
+        "pic07_courtesy": "",
+        "pic08_url": "",
+        "pic08_desc": "",
+        "pic08_grapher": "",
+        "pic08_courtesy": "",
+        "pic09_url": "",
+        "pic09_desc": "",
+        "pic09_grapher": "",
+        "pic09_courtesy": "",
+        "podcast_url": "https://dl.dropboxusercontent.com/scl/fi/gy1a9enyyvlz7lzxewgd0/.mp3?rlkey=yk85dy23b17gx5e59yblzs3zd&st=eacvqfnp&dl=0",
+        "podcast_start": 480
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          121.388097,
+          24.973215
+        ]
+      },
+      "properties": {
+        "name": "大豐煤礦工寮",
+        "type1": "礦業遺構",
+        "type2": "宿舍",
+        "desc": "礦工及其家屬居住的簡易宿舍，多以紅磚或木材搭建，空間雖然狹小但生活功能俱全。此處是礦工勞動後的休息港灣，也承載了鄰里間的情感與回憶。現為民宅一棟。\n",
+        "story": "工寮承載了無數礦工家庭的喜怒哀樂。在艱苦的採礦歲月中，來自各地的勞動者在此聚居，形成了一種緊密的鄰里關係。傍晚時分，工寮升起的炊煙與礦工們洗去煤灰後的笑聲，構築了這座礦山城鎮最溫暖的人情風景。",
+        "era": "1960s",
+        "site": "樹林",
+        "url": "",
+        "出處": "引用自鍾心怡，《臺北縣縣定古蹟山佳車站調查研究及修復計畫》",
+        "video": "",
+        "stage": "",
+        "pic01_url": "https://drive.google.com/thumbnail?id=18uXqdmegVWo_12N43MhHYXTl_d5pS6Ow&sz=w2000",
+        "pic01_desc": "現為民宅",
+        "pic01_grapher": "",
+        "pic01_courtesy": "高子超提供，拍攝於2026/05/19",
+        "pic02_url": "",
+        "pic02_desc": "",
+        "pic02_grapher": "",
+        "pic02_courtesy": "",
+        "pic03_url": "",
+        "pic03_desc": "",
+        "pic03_grapher": "",
+        "pic03_courtesy": "",
+        "pic04_url": "",
+        "pic04_desc": "",
+        "pic04_grapher": "",
+        "pic04_courtesy": "",
+        "pic05_url": "",
+        "pic05_desc": "",
+        "pic05_grapher": "",
+        "pic05_courtesy": "",
+        "pic06_url": "",
+        "pic06_desc": "",
+        "pic06_grapher": "",
+        "pic06_courtesy": "",
+        "pic07_url": "",
+        "pic07_desc": "",
+        "pic07_grapher": "",
+        "pic07_courtesy": "",
+        "pic08_url": "",
+        "pic08_desc": "",
+        "pic08_grapher": "",
+        "pic08_courtesy": "",
+        "pic09_url": "",
+        "pic09_desc": "",
+        "pic09_grapher": "",
+        "pic09_courtesy": "",
+        "podcast_url": "https://dl.dropboxusercontent.com/scl/fi/gy1a9enyyvlz7lzxewgd0/.mp3?rlkey=yk85dy23b17gx5e59yblzs3zd&st=eacvqfnp&dl=0",
+        "podcast_start": 510
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          121.39493,
+          24.972896
+        ]
+      },
+      "properties": {
+        "name": "山佳巷彩繪巷",
+        "type1": "常民生活",
+        "type2": "人文地景",
+        "desc": "山佳彩繪巷，即當地人稱之山佳街，原本就是山佳地區早期的聚落之一，已達百年歷史，故也被稱作山佳百年老街。山佳街透過互動式彩繪的方式，達到地方創生的目的，並結合一旁的鐵道地景公園，一同述說著山佳地區礦業興衰的故事。",
+        "story": "山佳街具體是在哪一年出現已經難以查詢，但可以確定已達百年以上，結合山佳地區的發展來看，可能是隨著礦業發展和車站設立而興起。山佳街緊鄰鐵道，不論新舊路線皆是如此。2009年鐵路截彎取直後，剛好配合鐵路地景公園的創設，山佳街也相對應的著手創生計畫，即現今的彩繪街繪製。",
+        "era": "現代",
+        "site": "樹林",
+        "url": "",
+        "出處": null,
+        "pic01_url": "https://lh3.googleusercontent.com/d/1qqlUn0bQ3JofkvT1TDr3OAkV2d_vu8Qy",
+        "pic01_desc": "彩繪巷入口",
+        "pic01_grapher": "",
+        "pic01_courtesy": "陳柏宇提供，拍攝於2026/04/18",
+        "pic02_url": "",
+        "pic02_desc": "",
+        "pic02_grapher": "",
+        "pic02_courtesy": "",
+        "pic03_url": "",
+        "pic03_desc": "",
+        "pic03_grapher": "",
+        "pic03_courtesy": "",
+        "pic04_url": "",
+        "pic04_desc": "",
+        "pic04_grapher": "",
+        "pic04_courtesy": "",
+        "pic05_url": "",
+        "pic05_desc": "",
+        "pic05_grapher": "",
+        "pic05_courtesy": "",
+        "pic06_url": "",
+        "pic06_desc": "",
+        "pic06_grapher": "",
+        "pic06_courtesy": "",
+        "pic07_url": "",
+        "pic07_desc": "",
+        "pic07_grapher": "",
+        "pic07_courtesy": "",
+        "pic08_url": "",
+        "pic08_desc": "",
+        "pic08_grapher": "",
+        "pic08_courtesy": "",
+        "pic09_url": "",
+        "pic09_desc": "",
+        "pic09_grapher": "",
+        "pic09_courtesy": "",
+        "podcast_url": "https://dl.dropboxusercontent.com/scl/fi/gy1a9enyyvlz7lzxewgd0/.mp3?rlkey=yk85dy23b17gx5e59yblzs3zd&st=eacvqfnp&dl=0",
+        "podcast_start": 700
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          121.418376,
+          24.996252
+        ]
+      },
+      "properties": {
+        "name": "豐林煤礦三號坑口",
+        "type1": "礦業遺構",
+        "type2": "坑口",
+        "desc": "位於樹林潭底公園活動中心旁的「豐林煤礦三坑坑口」，是見證當地早年採煤盛況的珍貴歷史遺蹟。該礦坑建於1957年（民國46年），特殊之處在於它是從平地斜挖深入地底50公尺後再平挖，至今仍保持相當完好的混凝土坑口外觀。",
+        "story": "這裡舊稱「潭底」，早年曾是一片水源充沛的低窪濕地，當地農民世代在此栽種鮮嫩的茭白筍。直到1957年，台電所組織的煤礦開發公司打破了這片水田的寧靜，在此開挖豐林煤礦三坑。這座礦坑非常特別，它是直接在平地上像朝地底深掘，工人們用一根根相思木扎實地撐起地底通道，一路往新莊方向掘進。當年的採煤盛況空前，甚至連現在保安街前頭的街道，都因此被命名為「豐林街」。然而，黑金的繁華卻帶來了環境的代價，長年的地底開鑿與大量排水，導致當地的地下水位暴跌、地層嚴重下陷，賴以維生的茭白筍田紛紛乾涸，憤怒的農民因此掀起了激烈的抗爭。最終，在村民的群起反對與進口煤炭的低價衝擊下，這座興盛一時的礦坑於1967年黯然停採，將這片土地重新歸於平靜。",
+        "era": "1950s",
+        "site": "樹林",
+        "url": "",
+        "出處": "引用自張偉郎，《海山地區煤礦業遺址調查報告》",
+        "video": "",
+        "stage": "",
+        "pic01_url": "https://drive.google.com/thumbnail?id=1yd14ch94CB1WkPHZiJDTs6vmU5KO8T3X&sz=w2000",
+        "pic01_desc": "正面照",
+        "pic01_grapher": "",
+        "pic01_courtesy": "高子超提供，拍攝於2026/05/19",
+        "pic02_url": "https://drive.google.com/thumbnail?id=14jrimD5Z8mjRmmQpLKLXsL708CR0d0zJ&sz=w2000",
+        "pic02_desc": "背面照",
+        "pic02_grapher": "",
+        "pic02_courtesy": "高子超提供，拍攝於2026/05/19",
+        "pic03_url": "",
+        "pic03_desc": "",
+        "pic03_grapher": "",
+        "pic03_courtesy": "",
+        "pic04_url": "",
+        "pic04_desc": "",
+        "pic04_grapher": "",
+        "pic04_courtesy": "",
+        "pic05_url": "",
+        "pic05_desc": "",
+        "pic05_grapher": "",
+        "pic05_courtesy": "",
+        "pic06_url": "",
+        "pic06_desc": "",
+        "pic06_grapher": "",
+        "pic06_courtesy": "",
+        "pic07_url": "",
+        "pic07_desc": "",
+        "pic07_grapher": "",
+        "pic07_courtesy": "",
+        "pic08_url": "",
+        "pic08_desc": "",
+        "pic08_grapher": "",
+        "pic08_courtesy": "",
+        "pic09_url": "",
+        "pic09_desc": "",
+        "pic09_grapher": "",
+        "pic09_courtesy": "",
+        "podcast_url": "https://dl.dropboxusercontent.com/scl/fi/gy1a9enyyvlz7lzxewgd0/.mp3?rlkey=yk85dy23b17gx5e59yblzs3zd&st=eacvqfnp&dl=0",
+        "podcast_start": 100
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          121.39473,
+          24.97326
+        ]
+      },
+      "properties": {
+        "name": "全興宮",
+        "type1": "公眾信仰",
+        "type2": "土地公",
+        "desc": "位於新北市樹林山佳（山仔腳）車站旁的全興寺（山佳土地公廟），是一座外觀樸素靜謐、供奉百年土地公的在地信仰中心。這裡位置極佳，緊鄰鐵道，參拜時能直接眺望火車疾駛而過的日常景色。在早年山佳煤礦業興盛時期，它更是礦工們入坑前祈求平安的精神寄託，至今仍默默守護著鐵道旁的樸實小鎮。",
+        "story": "全興寺的具體創建年代已不可考，但其供奉的百年土地公神像，深深扎根於山佳的歷史記憶中。早年山佳地區是著名的煤礦產地，採礦是一份與天搏命的高風險工作，礦工們每次深入黑暗、危險的地底坑道前，都會來到這座土地公廟虔誠膜拜，祈求神明保佑出坑平安與礦產豐收。隨著時間推移，圍繞著全興寺便逐漸形成了凝聚地方情感的礦業聚落。儘管隨著煤礦業停採、聚落轉型，2015年還曾發生神像一度遭人掉包的風波，但土地公依然默默守護在車站旁，從過去保佑礦工平安的黑金歲月，到如今繼續照看著這座樸實的歷史小鎮。",
+        "era": "日治",
+        "site": "樹林",
+        "url": "",
+        "出處": null,
+        "pic01_url": "",
+        "pic01_desc": "",
+        "pic01_grapher": "",
+        "pic01_courtesy": "",
+        "pic02_url": "",
+        "pic02_desc": "",
+        "pic02_grapher": "",
+        "pic02_courtesy": "",
+        "pic03_url": "",
+        "pic03_desc": "",
+        "pic03_grapher": "",
+        "pic03_courtesy": "",
+        "pic04_url": "",
+        "pic04_desc": "",
+        "pic04_grapher": "",
+        "pic04_courtesy": "",
+        "pic05_url": "",
+        "pic05_desc": "",
+        "pic05_grapher": "",
+        "pic05_courtesy": "",
+        "pic06_url": "",
+        "pic06_desc": "",
+        "pic06_grapher": "",
+        "pic06_courtesy": "",
+        "pic07_url": "",
+        "pic07_desc": "",
+        "pic07_grapher": "",
+        "pic07_courtesy": "",
+        "pic08_url": "",
+        "pic08_desc": "",
+        "pic08_grapher": "",
+        "pic08_courtesy": "",
+        "pic09_url": "",
+        "pic09_desc": "",
+        "pic09_grapher": "",
+        "pic09_courtesy": "",
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          121.411878,
+          24.991798
+        ]
+      },
+      "properties": {
+        "name": "福林煤礦",
+        "type1": "礦業遺構",
+        "type2": "坑口",
+        "desc": "位於樹林區的坡內坑與潭底一帶，地質屬於山子腳煤田的石底層。該礦區主要採行斜坑方式進行開採，且開採出來的煤炭會直接運往鄰近的樹林車站",
+        "story": "福林煤礦的前身為日治時期的「樹林鑛業所一坑」，當時是由中臺商事株式會社向臺陽鑛業株式會社承包開採。然而，該礦在昭和 19 年（1944年）11 月底一度廢業，當時礦工全數遭到遣散，礦場的資產與設備也被裁撤。戰後，臺陽鑛業代表人顏欽賢重新申請換發礦業執照，隨後將礦權移轉給了顏滄海（他在二戰末期的皇民化運動中曾一度改名為「立川滄海」），並正式將礦場命名為「福林煤礦」。戰後該礦坑由中臺礦業股份有限公司持續經營（後續代表人為顏德潤），重新恢復了該區的煤炭開採作業。",
+        "era": "日治",
+        "site": "樹林",
+        "url": "",
+        "出處": "引用自張偉郎，《海山地區煤礦業遺址調查報告》",
+        "video": "",
+        "stage": "",
+        "pic01_url": "https://lh3.googleusercontent.com/d/1-CYbVoSmSHsVu0WZW_w2D98BZOdjKU78",
+        "pic01_desc": "福林煤礦變電所",
+        "pic01_grapher": "",
+        "pic01_courtesy": "國家文化記憶庫提供，拍攝於2012/10/14（https://tcmb.culture.tw/zh-tw/detail?indexCode=Culture_Place&id=321022）",
+        "pic02_url": "",
+        "pic02_desc": "",
+        "pic02_grapher": "",
+        "pic02_courtesy": "",
+        "pic03_url": "",
+        "pic03_desc": "",
+        "pic03_grapher": "",
+        "pic03_courtesy": "",
+        "pic04_url": "",
+        "pic04_desc": "",
+        "pic04_grapher": "",
+        "pic04_courtesy": "",
+        "pic05_url": "",
+        "pic05_desc": "",
+        "pic05_grapher": "",
+        "pic05_courtesy": "",
+        "pic06_url": "",
+        "pic06_desc": "",
+        "pic06_grapher": "",
+        "pic06_courtesy": "",
+        "pic07_url": "",
+        "pic07_desc": "",
+        "pic07_grapher": "",
+        "pic07_courtesy": "",
+        "pic08_url": "",
+        "pic08_desc": "",
+        "pic08_grapher": "",
+        "pic08_courtesy": "",
+        "pic09_url": "",
+        "pic09_desc": "",
+        "pic09_grapher": "",
+        "pic09_courtesy": "",
+        "podcast_url": "https://dl.dropboxusercontent.com/scl/fi/gy1a9enyyvlz7lzxewgd0/.mp3?rlkey=yk85dy23b17gx5e59yblzs3zd&st=eacvqfnp&dl=0",
+        "podcast_start": 615
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          121.411321,
+          24.984894
+        ]
+      },
+      "properties": {
+        "name": "豐林煤礦一號坑",
+        "type1": "礦業遺構",
+        "type2": "坑口",
+        "desc": "位於新北巿樹林區大同山東南方的坡內里。戰後民國 45 年由省政府公告撤銷礦權並予以保留，隔年由國營的中國煤礦開發公司申請設權並成立第一礦場。民國 53 年隨豐林煤礦整體移交給臺灣電力公司接管，後因採礦作業引發地層下陷問題，導致農民抗議，最終於民國 60 年被迫撤收停工",
+        "story": "與有明確日治時期前身的第二、第三礦場不同，豐林煤礦第一礦場的紀錄主要始於戰後。民國 45 年 7 月，臺灣省政府建設廳公告撤銷該區域（涵蓋坡內坑、山子腳地方）的礦業權並將其保留。民國 46 年 2 月，由國營的「中國煤礦開發股份有限公司」正式申請設權，取得面積約 61.7 公頃的礦區，並命名為「豐林煤礦第一礦場」。在中國煤礦開發公司經營期間，豐林煤礦的第一任礦長為沈祖洪，第二任則為龔風岐。民國 53 年 8 月，中國煤礦開發公司結束營業（同年 12 月公司解散），豐林煤礦便整體移交給「臺灣電力公司」接管。然而，在移交台電經營後，豐林煤礦的採礦作業引發了嚴重的地層下陷問題，導致當地農民發起強烈抗議。在抗議與壓力下，該礦區最終於民國 60 年被迫撤收停工，走向關閉的命運。",
+        "era": "日治",
+        "site": "樹林",
+        "url": "",
+        "出處": "引用自張偉郎，《海山地區煤礦業遺址調查報告》",
+        "video": "",
+        "stage": "",
+        "pic01_url": "https://lh3.googleusercontent.com/d/1_rmP-7tJr_tKmo300QZnmDBPS6y19bK6",
+        "pic01_desc": "豐林煤礦第一礦場坑口現狀",
+        "pic01_grapher": "",
+        "pic01_courtesy": "國家文化記憶庫提供，拍攝於2012/10/07（https://tcmb.culture.tw/zh-tw/detail?indexCode=Culture_Place&id=223209）",
+        "pic02_url": "",
+        "pic02_desc": "",
+        "pic02_grapher": "",
+        "pic02_courtesy": "",
+        "pic03_url": "",
+        "pic03_desc": "",
+        "pic03_grapher": "",
+        "pic03_courtesy": "",
+        "pic04_url": "",
+        "pic04_desc": "",
+        "pic04_grapher": "",
+        "pic04_courtesy": "",
+        "pic05_url": "",
+        "pic05_desc": "",
+        "pic05_grapher": "",
+        "pic05_courtesy": "",
+        "pic06_url": "",
+        "pic06_desc": "",
+        "pic06_grapher": "",
+        "pic06_courtesy": "",
+        "pic07_url": "",
+        "pic07_desc": "",
+        "pic07_grapher": "",
+        "pic07_courtesy": "",
+        "pic08_url": "",
+        "pic08_desc": "",
+        "pic08_grapher": "",
+        "pic08_courtesy": "",
+        "pic09_url": "",
+        "pic09_desc": "",
+        "pic09_grapher": "",
+        "pic09_courtesy": "",
+        "podcast_url": "https://dl.dropboxusercontent.com/scl/fi/gy1a9enyyvlz7lzxewgd0/.mp3?rlkey=yk85dy23b17gx5e59yblzs3zd&st=eacvqfnp&dl=0",
+        "podcast_start": 615
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          121.4083,
+          24.9888
+        ]
+      },
+      "properties": {
+        "name": "豐林煤礦二號坑",
+        "type1": "礦業遺構",
+        "type2": "坑口",
+        "desc": "前身為日治時期的「昭和炭礦」，設有主斜坑開採燃料煤。早期透過輕便鐵路將煤炭運送至樹林車站，見證了坡內里一帶早年的採礦規模。",
+        "story": "豐林煤礦第二礦場的前身，是日治時期的「昭和炭礦」。該礦區早期的採礦權經歷過多次轉手，直到大正 11 年由俞石堂接手（當時稱坡內坑炭礦），並於昭和 13 年起交由西川純包採後，才正式被稱為「昭和炭礦」。 戰後，原礦主俞石堂重新申請換發礦業執照，隨後該區的礦權由國營的「中國煤礦開發股份有限公司」取得，並曾命名為「樹林煤礦」。礦場主要開採山子腳煤田石底層的普通燃料煤，設有主斜坑一坑，且具備利用輕便鐵路將煤炭運至樹林火車站的運輸系統。不過第二礦場並未獨立營運至最後，在民國 52 年，其礦區被整併入豐林煤礦第三礦場（礦業字第 1885 號）之中，第二礦場的礦區便隨之註銷",
+        "era": "日治",
+        "site": "樹林",
+        "url": "",
+        "出處": "引用自張偉郎，《海山地區煤礦業遺址調查報告》",
+        "video": "",
+        "stage": "",
+        "pic01_url": "https://lh3.googleusercontent.com/d/1h365AK-CU3FDxQJz6-A9RiJXlQmU1UDi",
+        "pic01_desc": "豐林煤礦二號坑口現狀",
+        "pic01_grapher": "",
+        "pic01_courtesy": "國家文化記憶庫提供，拍攝於2012/10/07（https://tcmb.culture.tw/zh-tw/detail?indexCode=Culture_Place&id=321011）",
+        "pic02_url": "",
+        "pic02_desc": "",
+        "pic02_grapher": "",
+        "pic02_courtesy": "",
+        "pic03_url": "",
+        "pic03_desc": "",
+        "pic03_grapher": "",
+        "pic03_courtesy": "",
+        "pic04_url": "",
+        "pic04_desc": "",
+        "pic04_grapher": "",
+        "pic04_courtesy": "",
+        "pic05_url": "",
+        "pic05_desc": "",
+        "pic05_grapher": "",
+        "pic05_courtesy": "",
+        "pic06_url": "",
+        "pic06_desc": "",
+        "pic06_grapher": "",
+        "pic06_courtesy": "",
+        "pic07_url": "",
+        "pic07_desc": "",
+        "pic07_grapher": "",
+        "pic07_courtesy": "",
+        "pic08_url": "",
+        "pic08_desc": "",
+        "pic08_grapher": "",
+        "pic08_courtesy": "",
+        "pic09_url": "",
+        "pic09_desc": "",
+        "pic09_grapher": "",
+        "pic09_courtesy": "",
+        "podcast_url": "https://dl.dropboxusercontent.com/scl/fi/gy1a9enyyvlz7lzxewgd0/.mp3?rlkey=yk85dy23b17gx5e59yblzs3zd&st=eacvqfnp&dl=0",
+        "podcast_start": 615
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          121.4055,
+          24.99
+        ]
+      },
+      "properties": {
+        "name": "坡內坑煤礦",
+        "type1": "礦業遺構",
+        "type2": "坑口",
+        "desc": "位於坡內坑與山子腳一帶，主要開採石底層燃料煤，以平水坑道為核心。礦場歷經多次經營權轉手與更名，最終於民國 70 年正式收坑走入歷史。",
+        "story": "坡內坑煤礦的前身，是日治時期的「昭和炭礦」（早期也曾被稱為坡內坑炭坑、坡內坑炭礦），當時由西川純、西川滿父子包採，並與黃子欽經營的「隆記煤礦」共同合作經營。戰後，該區段重新設立礦權（礦業字第 1748 號），由簡掽、黃子欽與王志賢等人共同取得，並由簡掽擔任代表人開採，正式命名為「坡內坑煤礦」。該礦區在戰後經歷了數次整併與易手。民國 52 年，相鄰的「克明煤礦」礦權移轉給簡掽後，原「坡內坑煤礦」的礦權字號便遭到註銷整併。到了民國 66 年，礦區的經營權移轉給新成立的「信建煤礦股份有限公司」（因此後續亦稱信建煤礦）繼續營運。最終，該礦場於民國 70 年正式收坑停工，結束了戰後長達 31 年的開採歲月，並於民國 76 年 12 月 30 日正式註銷礦業權。",
+        "era": "日治",
+        "site": "樹林",
+        "url": "",
+        "出處": "引用自張偉郎，《海山地區煤礦業遺址調查報告》",
+        "video": "",
+        "stage": "",
+        "pic01_url": "https://lh3.googleusercontent.com/d/1cYl91Gd_Cl4roHa9CebMQaM97ZJjlX6g",
+        "pic01_desc": "坡內坑煤礦現狀",
+        "pic01_grapher": "",
+        "pic01_courtesy": "新北學提供，拍攝於2012/09/28（hhttps://dcm.s3.hicloud.net.tw/new/excel/place/2020-02-07/782f0964-2128-4191-8215-3741ed666fd3/collection/3979fb04-3468-41c2-8ec7-fa6b1245681b/79c9124b-5213-431a-97de-7676ff69937d.JPG）",
+        "pic02_url": "",
+        "pic02_desc": "",
+        "pic02_grapher": "",
+        "pic02_courtesy": "",
+        "pic03_url": "",
+        "pic03_desc": "",
+        "pic03_grapher": "",
+        "pic03_courtesy": "",
+        "pic04_url": "",
+        "pic04_desc": "",
+        "pic04_grapher": "",
+        "pic04_courtesy": "",
+        "pic05_url": "",
+        "pic05_desc": "",
+        "pic05_grapher": "",
+        "pic05_courtesy": "",
+        "pic06_url": "",
+        "pic06_desc": "",
+        "pic06_grapher": "",
+        "pic06_courtesy": "",
+        "pic07_url": "",
+        "pic07_desc": "",
+        "pic07_grapher": "",
+        "pic07_courtesy": "",
+        "pic08_url": "",
+        "pic08_desc": "",
+        "pic08_grapher": "",
+        "pic08_courtesy": "",
+        "pic09_url": "",
+        "pic09_desc": "",
+        "pic09_grapher": "",
+        "pic09_courtesy": "",
+        "podcast_url": "https://dl.dropboxusercontent.com/scl/fi/gy1a9enyyvlz7lzxewgd0/.mp3?rlkey=yk85dy23b17gx5e59yblzs3zd&st=eacvqfnp&dl=0",
+        "podcast_start": 615
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          121.3988,
+          24.9837
+        ]
+      },
+      "properties": {
+        "name": "信建煤礦",
+        "type1": "礦業遺構",
+        "type2": "坑口",
+        "desc": "位於樹林區坡內坑、山子腳與橫坑子一帶，主要開採山子腳煤田石底層的中層燃料煤。其主要坑道為長達200公尺的平水坑。礦場距離樹林火車站約2.1公里，開採出的煤炭皆以卡車進行運送。",
+        "story": "信建煤礦的前身為日治時期由西川純、西川滿包採的「昭和炭礦」，以及黃子欽經營的「隆記煤礦」。戰後，該區段由簡掽、黃子欽與王志賢等人取得礦權，並由簡掽擔任代表人，正式成立了「坡內坑煤礦」。民國46年，黃子欽在相鄰的橫坑子區域另設立了「克明煤礦」。 到了民國52年，克明煤礦的礦權移轉給簡掽，隨後原「坡內坑煤礦」的礦權遭到註銷，兩者進行了礦區整併與擴大。民國66年，礦區的經營權正式轉手給「信建煤礦股份有限公司」接續營運。信建煤礦及其前身在戰後總計開採了31年（期間曾停休2年），最終於民國70年走向收坑停工的命運，並於民國76年12月30日正式註銷礦業權。",
+        "era": "日治",
+        "site": "樹林",
+        "url": "",
+        "出處": "引用自張偉郎，《海山地區煤礦業遺址調查報告》",
+        "video": "",
+        "stage": "",
+        "pic01_url": "https://lh3.googleusercontent.com/d/1hCTwCarE-_t4HjjNP_A_8ZF9j63tTAdH",
+        "pic01_desc": "信建煤礦坑口現狀",
+        "pic01_grapher": "",
+        "pic01_courtesy": "國家文化記憶庫提供，拍攝於2012/10/07（https://tcmb.culture.tw/zh-tw/detail?indexCode=Culture_Place&id=223210）",
+        "pic02_url": "",
+        "pic02_desc": "",
+        "pic02_grapher": "",
+        "pic02_courtesy": "",
+        "pic03_url": "",
+        "pic03_desc": "",
+        "pic03_grapher": "",
+        "pic03_courtesy": "",
+        "pic04_url": "",
+        "pic04_desc": "",
+        "pic04_grapher": "",
+        "pic04_courtesy": "",
+        "pic05_url": "",
+        "pic05_desc": "",
+        "pic05_grapher": "",
+        "pic05_courtesy": "",
+        "pic06_url": "",
+        "pic06_desc": "",
+        "pic06_grapher": "",
+        "pic06_courtesy": "",
+        "pic07_url": "",
+        "pic07_desc": "",
+        "pic07_grapher": "",
+        "pic07_courtesy": "",
+        "pic08_url": "",
+        "pic08_desc": "",
+        "pic08_grapher": "",
+        "pic08_courtesy": "",
+        "pic09_url": "",
+        "pic09_desc": "",
+        "pic09_grapher": "",
+        "pic09_courtesy": "",
+        "podcast_url": "https://dl.dropboxusercontent.com/scl/fi/gy1a9enyyvlz7lzxewgd0/.mp3?rlkey=yk85dy23b17gx5e59yblzs3zd&st=eacvqfnp&dl=0",
+        "podcast_start": 698
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          121.3781,
+          24.9729
+        ]
+      },
+      "properties": {
+        "name": "山子腳煤礦",
+        "type1": "礦業遺構",
+        "type2": "坑口",
+        "desc": "位於新北巿樹林區樂山里石灰坑地方。該礦主要開採山子腳煤田石底層的普通燃料煤。礦場早期使用軌臺車道，後改以卡車載煤。",
+        "story": "山子腳煤礦的前身是日治時期由中臺商事株式會社經營的「山子腳鑛業所」。該礦於昭和 15 年起開鑿坑道，但在戰爭期間曾受日本政府命令而廢礦，直到戰後的民國 34 年才復工並擴充設備。 民國 41 年，山子腳煤礦從中臺礦業中分離出來，改由顏滄海獨資經營。然而，因獨資經營不善且負債頗鉅，民國 51 年面臨停工，產權更遭到法院查封，隨後由「山子腳煤礦股份有限公司」接手開採。 後續該礦由古金波接手繼續經營，並改稱為「古山煤礦」，卻爆發了複雜的礦權糾紛。另一位關係人周成文主張自己擁有開採合約，雙方為了礦權對簿公堂，不僅一路打到最高法院，甚至還為此聲請釋憲（有興趣者可查釋字383），該礦也因為這場官司糾紛而一度停產,。歷經波折後，該區域於民國 58 年重新設立新礦權，最終由「大和煤礦股份有限公司」經營，定名為「大和煤礦」，持續開採至民國 71 年收坑，並於民國 76 年正式註銷礦權。",
+        "era": "日治",
+        "site": "樹林",
+        "url": "",
+        "出處": "引用自張偉郎，《海山地區煤礦業遺址調查報告》",
+        "video": "",
+        "stage": "",
+        "pic01_url": "https://lh3.googleusercontent.com/d/1f9LoQ5ymV5ara-n-71MR1s3xSNLH-b3a",
+        "pic01_desc": "山子腳煤礦坑口現狀",
+        "pic01_grapher": "",
+        "pic01_courtesy": "國家文化記憶庫提供，拍攝於2012/09/28（https://tcmb.culture.tw/zh-tw/detail?indexCode=Culture_Place&id=321987）",
+        "pic02_url": "",
+        "pic02_desc": "",
+        "pic02_grapher": "",
+        "pic02_courtesy": "",
+        "pic03_url": "",
+        "pic03_desc": "",
+        "pic03_grapher": "",
+        "pic03_courtesy": "",
+        "pic04_url": "",
+        "pic04_desc": "",
+        "pic04_grapher": "",
+        "pic04_courtesy": "",
+        "pic05_url": "",
+        "pic05_desc": "",
+        "pic05_grapher": "",
+        "pic05_courtesy": "",
+        "pic06_url": "",
+        "pic06_desc": "",
+        "pic06_grapher": "",
+        "pic06_courtesy": "",
+        "pic07_url": "",
+        "pic07_desc": "",
+        "pic07_grapher": "",
+        "pic07_courtesy": "",
+        "pic08_url": "",
+        "pic08_desc": "",
+        "pic08_grapher": "",
+        "pic08_courtesy": "",
+        "pic09_url": "",
+        "pic09_desc": "",
+        "pic09_grapher": "",
+        "pic09_courtesy": "",
+        "podcast_url": "https://dl.dropboxusercontent.com/scl/fi/gy1a9enyyvlz7lzxewgd0/.mp3?rlkey=yk85dy23b17gx5e59yblzs3zd&st=eacvqfnp&dl=0",
+        "podcast_start": 1415
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          121.3758,
+          24.974
+        ]
+      },
+      "properties": {
+        "name": "山子腳礦業所",
+        "type1": "礦業遺構",
+        "type2": "坑口",
+        "desc": "位於樹林區阿南坑與石灰坑一帶，主要開採山子腳煤田石底層的普通燃料煤。該礦區歷經多次轉手與改名。二戰期間曾受日本政府命令而一度廢礦，直到戰後民國 34 年才復工。",
+        "story": "山子腳礦業所的礦區自明治 35 年設立礦權後就屢次易主，大正 4 年時，原礦主（張翼賦）因為債務無法履行，導致礦權遭到拍賣，最終由債權人顏雲年（臺灣興業信託株式會社）取得。之後該礦區先後被稱作阿南炭坑、振益炭坑、成益炭礦與豐隆炭礦。 到了昭和 15 年（1940年），臺陽鑛業為了讓開採更加合理化而將礦區進行分割，並在昭和 16 年將礦權與經營交給了「中臺商事株式會社」，這時才正式定名為「山子腳鑛業所」。礦場隨即展開建設，開鑿了水平坑與第一斜坑進行開採，不過到了二戰期間，礦場受日本政府的命令而被迫廢礦停工。直到戰後的民國 34 年 11 月，礦場才重新復工、改修坑道，這座歷經滄桑的礦業所也正式成為了戰後「山子腳煤礦」的前身。",
+        "era": "日治",
+        "site": "樹林",
+        "url": "",
+        "出處": "引用自張偉郎，《海山地區煤礦業遺址調查報告》",
+        "video": "",
+        "stage": "",
+        "pic01_url": "https://lh3.googleusercontent.com/d/1PbSRH9F12fOqVRhxcEZRChp2x2FNdTjE",
+        "pic01_desc": "山子腳鑛業所坑口現狀",
+        "pic01_grapher": "",
+        "pic01_courtesy": "國家文化記憶庫提供，拍攝於2012/09/28（https://tcmb.culture.tw/zh-tw/detail?indexCode=Culture_Place&id=223212）：",
+        "pic02_url": "",
+        "pic02_desc": "",
+        "pic02_grapher": "",
+        "pic02_courtesy": "",
+        "pic03_url": "",
+        "pic03_desc": "",
+        "pic03_grapher": "",
+        "pic03_courtesy": "",
+        "pic04_url": "",
+        "pic04_desc": "",
+        "pic04_grapher": "",
+        "pic04_courtesy": "",
+        "pic05_url": "",
+        "pic05_desc": "",
+        "pic05_grapher": "",
+        "pic05_courtesy": "",
+        "pic06_url": "",
+        "pic06_desc": "",
+        "pic06_grapher": "",
+        "pic06_courtesy": "",
+        "pic07_url": "",
+        "pic07_desc": "",
+        "pic07_grapher": "",
+        "pic07_courtesy": "",
+        "pic08_url": "",
+        "pic08_desc": "",
+        "pic08_grapher": "",
+        "pic08_courtesy": "",
+        "pic09_url": "",
+        "pic09_desc": "",
+        "pic09_grapher": "",
+        "pic09_courtesy": "",
+        "podcast_url": "https://dl.dropboxusercontent.com/scl/fi/gy1a9enyyvlz7lzxewgd0/.mp3?rlkey=yk85dy23b17gx5e59yblzs3zd&st=eacvqfnp&dl=0",
+        "podcast_start": 1415
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          121.39278,
+          24.971961
+        ]
+      },
+      "properties": {
+        "name": "山佳煙燻雞腳",
+        "type1": "常民生活",
+        "type2": "飲食文化",
+        "desc": "擁有超過七十年歷史的山佳老字號名店，以祖傳秘方慢火燻製的雞腳聞名。口感Q彈入味且不油膩，是當地人懷舊的滋味，也是造訪山佳的首選伴手禮。",
+        "story": "「山佳煙燻雞腳」由鄭慶隆老先生於1951年從零開始創立。在那個物資純樸的年代，鄭老先生憑藉著對美味的堅持與獨門的煙燻技術，在山佳火車站旁點亮了傳承三代的炭火香氣。隨後老店主過世，為了讓這份陪伴地方一甲子的古早味延續下去，第二代兄弟們齊心協議，發展出全台少見、極具凝聚力的「每兩週輪流擺攤」營運模式。儘管各房在基本調味上恪守祖傳秘方，但因為個人手藝的微調，反而激盪出大房、老么等各自擁有忠實擁躉的獨特風味（如網路盛傳的「大嫂班」）。對鄭氏家族而言，這家店不只是一門生意，更是維繫家族情感與傳承父親心血的紐帶；他們深信，唯有腳踏實地守住每道繁複的滷製工序，才能讓每一位出外打拼歸來的遊子，在步出山佳車站時，都能透過這口熟悉的煙燻香氣，瞬間找回記憶中最溫暖的家鄉味。",
+        "era": "現代",
+        "site": "樹林",
+        "url": "",
+        "出處": "",
+        "video": "",
+        "stage": "",
+        "pic01_url": "",
+        "pic01_desc": "",
+        "pic01_grapher": "",
+        "pic01_courtesy": "",
+        "pic02_url": "",
+        "pic02_desc": "",
+        "pic02_grapher": "",
+        "pic02_courtesy": "",
+        "pic03_url": "",
+        "pic03_desc": "",
+        "pic03_grapher": "",
+        "pic03_courtesy": "",
+        "pic04_url": "",
+        "pic04_desc": "",
+        "pic04_grapher": "",
+        "pic04_courtesy": "",
+        "pic05_url": "",
+        "pic05_desc": "",
+        "pic05_grapher": "",
+        "pic05_courtesy": "",
+        "pic06_url": "",
+        "pic06_desc": "",
+        "pic06_grapher": "",
+        "pic06_courtesy": "",
+        "pic07_url": "",
+        "pic07_desc": "",
+        "pic07_grapher": "",
+        "pic07_courtesy": "",
+        "pic08_url": "",
+        "pic08_desc": "",
+        "pic08_grapher": "",
+        "pic08_courtesy": "",
+        "pic09_url": "",
+        "pic09_desc": "",
+        "pic09_grapher": "",
+        "pic09_courtesy": "",
+        "podcast_url": "https://dl.dropboxusercontent.com/scl/fi/gy1a9enyyvlz7lzxewgd0/.mp3?rlkey=yk85dy23b17gx5e59yblzs3zd&st=eacvqfnp&dl=0",
+        "podcast_start": 740
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          121.39272,
+          24.971344
+        ]
+      },
+      "properties": {
+        "name": "雲林香菇赤肉羹",
+        "type1": "常民生活",
+        "type2": "飲食文化",
+        "desc": "車站前的高人氣平民小吃，招牌赤肉羹選用紮實溫體豬肉搭配清甜香菇。簡單的滷肉飯與肉羹組合，滿足了旅人與居民的胃，展現小鎮樸實的味覺記憶。",
+        "story": "「雲林香菇赤肉羹」的創立，源自於對家鄉古早風味的懷念與傳承。老闆因感念南部雲林傳統小吃的純粹與人情味，決定將這份「不加過多魚漿修飾、純靠手工赤肉展現真材實料」的南部特色肉羹，復刻到新北市樹林的山佳一帶。創業十多年來，店家歷經了原物料飛漲與在地市場的更迭，但始終恪守「價格親民、份量實在」的經營初衷。對於許多不小心經過或每日通勤的鐵道上班族來說，這裡不只是一個填飽肚子的中繼站，更是山佳這座低調小鎮中，最能用一碗熱騰騰羹湯溫暖人心的深夜食堂（營業至晚間八點）。",
+        "era": "現代",
+        "site": "樹林",
+        "url": "",
+        "出處": null,
+        "pic01_url": "",
+        "pic01_desc": "",
+        "pic01_grapher": "",
+        "pic01_courtesy": "",
+        "pic02_url": "",
+        "pic02_desc": "",
+        "pic02_grapher": "",
+        "pic02_courtesy": "",
+        "pic03_url": "",
+        "pic03_desc": "",
+        "pic03_grapher": "",
+        "pic03_courtesy": "",
+        "pic04_url": "",
+        "pic04_desc": "",
+        "pic04_grapher": "",
+        "pic04_courtesy": "",
+        "pic05_url": "",
+        "pic05_desc": "",
+        "pic05_grapher": "",
+        "pic05_courtesy": "",
+        "pic06_url": "",
+        "pic06_desc": "",
+        "pic06_grapher": "",
+        "pic06_courtesy": "",
+        "pic07_url": "",
+        "pic07_desc": "",
+        "pic07_grapher": "",
+        "pic07_courtesy": "",
+        "pic08_url": "",
+        "pic08_desc": "",
+        "pic08_grapher": "",
+        "pic08_courtesy": "",
+        "pic09_url": "",
+        "pic09_desc": "",
+        "pic09_grapher": "",
+        "pic09_courtesy": "",
+        "podcast_url": "https://dl.dropboxusercontent.com/scl/fi/gy1a9enyyvlz7lzxewgd0/.mp3?rlkey=yk85dy23b17gx5e59yblzs3zd&st=eacvqfnp&dl=0",
+        "podcast_start": 990
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          121.3924,
+          24.97227
+        ]
+      },
+      "properties": {
+        "name": "青島藥燉牛肉麵",
+        "type1": "常民生活",
+        "type2": "飲食文化",
+        "desc": "充滿家庭溫馨感的餐廳，主打融合中藥材與牛大骨熬煮的藥燉湯頭。牛肉軟嫩入味，湯頭甘甜濃郁，在品嚐美味的同時也感受到食補的溫潤暖意。",
+        "story": "「青島藥燉牛肉麵」的誕生，是一段融合了山東人對麵食的堅持與多元文化交織的美味續曲。最初由山東籍的老闆隻身在山佳車站旁築起麵攤，他將北方人講究的麵條勁道，與台灣人喜愛的藥燉養生概念相結合，研發出這碗在台北少見的藥膳風味牛肉麵。隨後，這間店注入了東南亞的異國血統。隨著女店主的加入與協助，菜單上神奇地出現了南洋冰亮椰奶豆與越南泡菜等看似衝突、實則解膩的完美配角。對店家而言，這碗麵不只是填飽肚子的日常餐點，更是一面記錄著跨國情感與落地生根的文化鏡子。他們堅持不用繁複的連鎖手法，而是用樸實、近乎沉默卻專注的招待方式，讓每一位步出山佳地下道的旅人，都能在極具辨識度的藥膳炭香中，喝下一口溫補身心的純粹與包容。",
+        "era": "現代",
+        "site": "樹林",
+        "url": "",
+        "出處": null,
+        "pic01_url": "",
+        "pic01_desc": "",
+        "pic01_grapher": "",
+        "pic01_courtesy": "",
+        "pic02_url": "",
+        "pic02_desc": "",
+        "pic02_grapher": "",
+        "pic02_courtesy": "",
+        "pic03_url": "",
+        "pic03_desc": "",
+        "pic03_grapher": "",
+        "pic03_courtesy": "",
+        "pic04_url": "",
+        "pic04_desc": "",
+        "pic04_grapher": "",
+        "pic04_courtesy": "",
+        "pic05_url": "",
+        "pic05_desc": "",
+        "pic05_grapher": "",
+        "pic05_courtesy": "",
+        "pic06_url": "",
+        "pic06_desc": "",
+        "pic06_grapher": "",
+        "pic06_courtesy": "",
+        "pic07_url": "",
+        "pic07_desc": "",
+        "pic07_grapher": "",
+        "pic07_courtesy": "",
+        "pic08_url": "",
+        "pic08_desc": "",
+        "pic08_grapher": "",
+        "pic08_courtesy": "",
+        "pic09_url": "",
+        "pic09_desc": "",
+        "pic09_grapher": "",
+        "pic09_courtesy": "",
+        "podcast_url": "https://dl.dropboxusercontent.com/scl/fi/gy1a9enyyvlz7lzxewgd0/.mp3?rlkey=yk85dy23b17gx5e59yblzs3zd&st=eacvqfnp&dl=0",
+        "podcast_start": 950
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          121.39416,
+          24.97187
+        ]
+      },
+      "properties": {
+        "name": "心圓柑仔店",
+        "type1": "常民生活",
+        "type2": "市集",
+        "desc": "隱身巷弄的文創空間，巧妙結合懷舊雜貨店與現代複合式餐飲。店內陳列古早味零食並提供特色簡餐，連結新舊世代回憶，成為鄰里溫馨的交流據點。",
+        "story": "心圓柑仔店的誕生，源於年輕夫妻吳信謙與鄭怡對傳統人情味的眷戀與傳承期盼。在經歷網路世界的疏離後，他們決定打造一個能真實觸摸、溫暖交流的實體空間，將爺爺奶奶敦厚樸實的待人態度延續下去。店內保留的蓑衣與老脫穀機等物件，不僅紀念著長輩早年務農的日常，也與現代商品進行著跨越時空的對話，守護著過往的家庭記憶與土地故事。為實踐這個理念，夫婦倆親自走訪農田嚴選當季好水果（如夏季受歡迎的小玉西瓜），並堅持用最純粹的方式烹調每一道料理，期望透過食物傳遞真誠的關懷與溫度。每到午後時光，這裡便成為附近居民閒話家常、交流情感的聚會所。店外那面由農夫、雞與山組成的圓型招牌，不僅訴說著對天然食材的堅持，更代表了老闆夫婦期盼生活回歸純粹的初心。",
+        "era": "現代",
+        "site": "樹林",
+        "url": "",
+        "出處": "引用自新北市立樹林高級中學所編輯之《樹林采風》雜誌",
+        "video": "",
+        "stage": "",
+        "pic01_url": "",
+        "pic01_desc": "",
+        "pic01_grapher": "",
+        "pic01_courtesy": "",
+        "pic02_url": "",
+        "pic02_desc": "",
+        "pic02_grapher": "",
+        "pic02_courtesy": "",
+        "pic03_url": "",
+        "pic03_desc": "",
+        "pic03_grapher": "",
+        "pic03_courtesy": "",
+        "pic04_url": "",
+        "pic04_desc": "",
+        "pic04_grapher": "",
+        "pic04_courtesy": "",
+        "pic05_url": "",
+        "pic05_desc": "",
+        "pic05_grapher": "",
+        "pic05_courtesy": "",
+        "pic06_url": "",
+        "pic06_desc": "",
+        "pic06_grapher": "",
+        "pic06_courtesy": "",
+        "pic07_url": "",
+        "pic07_desc": "",
+        "pic07_grapher": "",
+        "pic07_courtesy": "",
+        "pic08_url": "",
+        "pic08_desc": "",
+        "pic08_grapher": "",
+        "pic08_courtesy": "",
+        "pic09_url": "",
+        "pic09_desc": "",
+        "pic09_grapher": "",
+        "pic09_courtesy": "",
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          121.42505,
+          24.99063
+        ]
+      },
+      "properties": {
+        "name": "麗華西點麵包行",
+        "type1": "常民生活",
+        "type2": "飲食文化",
+        "desc": "守護傳統烘焙滋味的樹林老牌名店，多年來堅持製作誠懇踏實的西點。招牌手工三明治以鬆軟吐司與紮實抹醬聞名，展現了傳統台式麵包店的溫潤與堅持。",
+        "story": "麗華西點麵包由老闆陳敬長與哥哥共同創立，五十年來承載了無數樹林人的童年回憶。陳敬長秉持著「誠信」的理念，認為做糕餅如同做人，急不得且必須真材實料。他堅持「不假他人之手」，親自進廚房監督製程，將每一塊蛋糕視為與顧客無聲的對話。 這種對品質的堅持，不僅讓老味道得以延續，更建立了深厚的鄰里情感。例如一位百歲的萬華長輩，每週都會特地南下樹林購買三明治；對許多顧客而言，推開餅店大門、聽見熟悉的鈴聲與老闆親切的笑容，不僅是品嚐熟悉的味道，更有一種「回家」的溫暖。近年來，麗華也與時俱進，在包裝與社群平台上創新，期望將這份結合健康、安全與在地文化的老店香氣，繼續傳承給下一代。",
+        "era": "現代",
+        "site": "樹林",
+        "url": "",
+        "出處": "引用自新北市立樹林高級中學所編輯之《樹林采風》雜誌",
+        "video": "",
+        "stage": "",
+        "pic01_url": "",
+        "pic01_desc": "",
+        "pic01_grapher": "",
+        "pic01_courtesy": "",
+        "pic02_url": "",
+        "pic02_desc": "",
+        "pic02_grapher": "",
+        "pic02_courtesy": "",
+        "pic03_url": "",
+        "pic03_desc": "",
+        "pic03_grapher": "",
+        "pic03_courtesy": "",
+        "pic04_url": "",
+        "pic04_desc": "",
+        "pic04_grapher": "",
+        "pic04_courtesy": "",
+        "pic05_url": "",
+        "pic05_desc": "",
+        "pic05_grapher": "",
+        "pic05_courtesy": "",
+        "pic06_url": "",
+        "pic06_desc": "",
+        "pic06_grapher": "",
+        "pic06_courtesy": "",
+        "pic07_url": "",
+        "pic07_desc": "",
+        "pic07_grapher": "",
+        "pic07_courtesy": "",
+        "pic08_url": "",
+        "pic08_desc": "",
+        "pic08_grapher": "",
+        "pic08_courtesy": "",
+        "pic09_url": "",
+        "pic09_desc": "",
+        "pic09_grapher": "",
+        "pic09_courtesy": "",
+        "podcast_url": "https://dl.dropboxusercontent.com/scl/fi/gy1a9enyyvlz7lzxewgd0/.mp3?rlkey=yk85dy23b17gx5e59yblzs3zd&st=eacvqfnp&dl=0",
+        "podcast_start": 432
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          121.426939,
+          24.99396
+        ]
+      },
+      "properties": {
+        "name": "濟安宮",
+        "type1": "公眾信仰",
+        "type2": "保生大帝",
+        "desc": "樹林知名的百年古剎，祭祀保生大帝。近年積極結合文創與數位社群，推出多樣化平安符商品與公益活動，成功讓傳統信仰轉型，散發年輕活力的現代氣息。",
+        "story": "面對傳統宗教香火式微與年輕世代流失的挑戰，總幹事羅沛禎以其創意與熱忱，為濟安宮找到了適應新時代的解答。她自大學畢業後便投入廟宇服務，深知要讓年輕人重新關注宗教，必須讓信仰走入數位日常。她堅持親自擔任社群小編，拒絕制式化的客服回應，以真誠聆聽並幫助香客解決問題。 濟安宮與在地社區培養了極深的默契與情感，例如在五朝清醮期間，周邊販售葷食的餐廳甚至為了配合廟方茹素而組團出國旅遊。羅沛禎深信「相信是所有信仰的起點」，她曾親身經歷祈求後天氣放晴及病患康復的奇蹟，這些靈驗的見證讓她更加堅定。在她的守護下，濟安宮不僅保留了傳統的信仰核心，更成功轉型為與現代社會共存、提供大眾溫暖心靈寄託的生活場域。",
+        "era": "現代",
+        "site": "樹林",
+        "url": "",
+        "video": "",
+        "stage": "",
+        "出處": "引用自新北市立樹林高級中學所編輯之《樹林采風》雜誌",
+        "pic01_url": "",
+        "pic01_desc": "",
+        "pic01_grapher": "",
+        "pic01_courtesy": "",
+        "pic02_url": "",
+        "pic02_desc": "",
+        "pic02_grapher": "",
+        "pic02_courtesy": "",
+        "pic03_url": "",
+        "pic03_desc": "",
+        "pic03_grapher": "",
+        "pic03_courtesy": "",
+        "pic04_url": "",
+        "pic04_desc": "",
+        "pic04_grapher": "",
+        "pic04_courtesy": "",
+        "pic05_url": "",
+        "pic05_desc": "",
+        "pic05_grapher": "",
+        "pic05_courtesy": "",
+        "pic06_url": "",
+        "pic06_desc": "",
+        "pic06_grapher": "",
+        "pic06_courtesy": "",
+        "pic07_url": "",
+        "pic07_desc": "",
+        "pic07_grapher": "",
+        "pic07_courtesy": "",
+        "pic08_url": "",
+        "pic08_desc": "",
+        "pic08_grapher": "",
+        "pic08_courtesy": "",
+        "pic09_url": "",
+        "pic09_desc": "",
+        "pic09_grapher": "",
+        "pic09_courtesy": "",
+        "podcast_url": "https://dl.dropboxusercontent.com/scl/fi/gy1a9enyyvlz7lzxewgd0/.mp3?rlkey=yk85dy23b17gx5e59yblzs3zd&st=eacvqfnp&dl=0",
+        "podcast_start": 322
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          121.419092,
+          24.98068
+        ]
+      },
+      "properties": {
+        "name": "萌德蔘藥房",
+        "type1": "常民生活",
+        "type2": "藥房",
+        "desc": "隱身巷弄的溫馨中藥行，保留傳統藥櫃與精準抓藥工藝，並結合現代包裝技術。店內收藏的古老南剪見證了家族傳承，傳遞出充滿草本香氣與人情味的守護。",
+        "story": "這家藥房承載著兩代人的家族記憶，現由第二代經營者楊振聰先生接手。原本就讀電機系的他，為了不讓家族事業中斷，毅然放棄所學，回到父親楊順情創立的中藥行幫忙。店裡那把被磨得光滑的老南剪，雖在現代已多被機器取代，卻象徵著手工製藥時代的堅持與智慧。對老闆而言，每一次的反覆秤量、一折一包的包裝動作，都是將前人的經驗、責任與對健康的承諾細心封存。萌德蔘藥房不僅見證了社區的變遷，更化身為文化載體，持續傳遞著人與人之間不輕易消失的溫度與信任。",
+        "era": "現代",
+        "site": "樹林",
+        "url": "",
+        "出處": "引用自新北市立樹林高級中學所編輯之《樹林采風》雜誌",
+        "video": "",
+        "stage": "",
+        "pic01_url": "",
+        "pic01_desc": "",
+        "pic01_grapher": "",
+        "pic01_courtesy": "",
+        "pic02_url": "",
+        "pic02_desc": "",
+        "pic02_grapher": "",
+        "pic02_courtesy": "",
+        "pic03_url": "",
+        "pic03_desc": "",
+        "pic03_grapher": "",
+        "pic03_courtesy": "",
+        "pic04_url": "",
+        "pic04_desc": "",
+        "pic04_grapher": "",
+        "pic04_courtesy": "",
+        "pic05_url": "",
+        "pic05_desc": "",
+        "pic05_grapher": "",
+        "pic05_courtesy": "",
+        "pic06_url": "",
+        "pic06_desc": "",
+        "pic06_grapher": "",
+        "pic06_courtesy": "",
+        "pic07_url": "",
+        "pic07_desc": "",
+        "pic07_grapher": "",
+        "pic07_courtesy": "",
+        "pic08_url": "",
+        "pic08_desc": "",
+        "pic08_grapher": "",
+        "pic08_courtesy": "",
+        "pic09_url": "",
+        "pic09_desc": "",
+        "pic09_grapher": "",
+        "pic09_courtesy": "",
+        "podcast_url": "https://dl.dropboxusercontent.com/scl/fi/gy1a9enyyvlz7lzxewgd0/.mp3?rlkey=yk85dy23b17gx5e59yblzs3zd&st=eacvqfnp&dl=0",
+        "podcast_start": 800
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          121.41137,
+          25.017349
+        ]
+      },
+      "properties": {
+        "name": "樹林酒廠",
+        "type1": "常民生活",
+        "type2": "酒廠",
+        "desc": "延續百年紅麴技術的民營酒廠，讓樹林「紅露酒故鄉」的美名得以傳承。廠方積極開發多元紅麴商品並推廣教育，致力轉型為結合文化與觀光的創新品牌基地。",
+        "story": "樹林擁有深厚的紅麴釀酒歷史，自1906年先賢創立造酒公司以來，歷經日治時期與國民政府的經營，曾讓樹林享有「紅露酒故鄉」的美譽。然而，1999年公辦酒廠遷至林口，使這項百年在地文化面臨連根拔起的危機。 不忍見家鄉的紅麴文化就此消失，老員工劉靜賜與前輩鐘杰輝憑藉著「絕對不能讓紅麴從樹林消失」的信念，自掏腰包籌資200萬元，並在歷經多次向政府陳情與爭取後，終於成功保留「樹林酒廠」這塊極具意義的招牌。對劉靜賜而言，酒廠不僅是一份事業，更是宛如親人般的存在；他致力於舉辦紅麴文化節與創意工作坊，堅信自己釀造的不僅僅是酒，而是一份歷史的延續與傳承，讓百年的文化底蘊在現代重新發光發熱。",
+        "era": "現代",
+        "site": "樹林",
+        "url": "",
+        "出處": "引用自新北市立樹林高級中學所編輯之《樹林采風》雜誌",
+        "video": "",
+        "stage": "",
+        "pic01_url": "",
+        "pic01_desc": "",
+        "pic01_grapher": "",
+        "pic01_courtesy": "",
+        "pic02_url": "",
+        "pic02_desc": "",
+        "pic02_grapher": "",
+        "pic02_courtesy": "",
+        "pic03_url": "",
+        "pic03_desc": "",
+        "pic03_grapher": "",
+        "pic03_courtesy": "",
+        "pic04_url": "",
+        "pic04_desc": "",
+        "pic04_grapher": "",
+        "pic04_courtesy": "",
+        "pic05_url": "",
+        "pic05_desc": "",
+        "pic05_grapher": "",
+        "pic05_courtesy": "",
+        "pic06_url": "",
+        "pic06_desc": "",
+        "pic06_grapher": "",
+        "pic06_courtesy": "",
+        "pic07_url": "",
+        "pic07_desc": "",
+        "pic07_grapher": "",
+        "pic07_courtesy": "",
+        "pic08_url": "",
+        "pic08_desc": "",
+        "pic08_grapher": "",
+        "pic08_courtesy": "",
+        "pic09_url": "",
+        "pic09_desc": "",
+        "pic09_grapher": "",
+        "pic09_courtesy": "",
+        "podcast_url": "https://dl.dropboxusercontent.com/scl/fi/gy1a9enyyvlz7lzxewgd0/.mp3?rlkey=yk85dy23b17gx5e59yblzs3zd&st=eacvqfnp&dl=0",
+        "podcast_start": 205
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          121.428361,
+          24.98608
+        ]
+      },
+      "properties": {
+        "name": "微間素生",
+        "type1": "常民生活",
+        "type2": "飲食文化",
+        "desc": "隱身巷弄的老宅咖啡廳兼工作室，保留紅磚瓦片等建築印記，營造復古寧靜氛圍。餐飲融合在地元素與巧思，讓老屋在慢步調中守護時代記憶，延續動人故事。",
+        "story": "「微間素生」店名蘊含深意：象徵微小精緻的細節、東方哲學的空間感、純粹的美好本質，以及老宅生命的延續。老闆王法鈞與合夥人雖無餐飲背景，卻憑藉純粹的熱愛跨足經營，期望將這裡打造成乘載故事的容器。他在設計時深入挖掘老屋歷史，將屋前的拱門與不同時代的瓦片視為歲月印記。這份用心讓老宅不僅成為長輩向孫輩介紹「紅眠床」等舊時代回憶的實體教材，更成為許多年輕人相遇、相戀甚至求婚的溫馨場所。在追求速食快文化的現代都市中，微間素生以其獨特的慢步調，守護著時代記憶，並持續孕育出屬於新世代的動人故事。",
+        "era": "現代",
+        "site": "樹林",
+        "url": "",
+        "出處": "引用自新北市立樹林高級中學所編輯之《樹林采風》雜誌",
+        "video": "",
+        "stage": "",
+        "pic01_url": "",
+        "pic01_desc": "",
+        "pic01_grapher": "",
+        "pic01_courtesy": "",
+        "pic02_url": "",
+        "pic02_desc": "",
+        "pic02_grapher": "",
+        "pic02_courtesy": "",
+        "pic03_url": "",
+        "pic03_desc": "",
+        "pic03_grapher": "",
+        "pic03_courtesy": "",
+        "pic04_url": "",
+        "pic04_desc": "",
+        "pic04_grapher": "",
+        "pic04_courtesy": "",
+        "pic05_url": "",
+        "pic05_desc": "",
+        "pic05_grapher": "",
+        "pic05_courtesy": "",
+        "pic06_url": "",
+        "pic06_desc": "",
+        "pic06_grapher": "",
+        "pic06_courtesy": "",
+        "pic07_url": "",
+        "pic07_desc": "",
+        "pic07_grapher": "",
+        "pic07_courtesy": "",
+        "pic08_url": "",
+        "pic08_desc": "",
+        "pic08_grapher": "",
+        "pic08_courtesy": "",
+        "pic09_url": "",
+        "pic09_desc": "",
+        "pic09_grapher": "",
+        "pic09_courtesy": "",
+        "podcast_url": "https://dl.dropboxusercontent.com/scl/fi/gy1a9enyyvlz7lzxewgd0/.mp3?rlkey=yk85dy23b17gx5e59yblzs3zd&st=eacvqfnp&dl=0",
+        "podcast_start": 560
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          121.419631,
+          24.975031
+        ]
+      },
+      "properties": {
+        "name": "紅磚園邸",
+        "type1": "常民生活",
+        "type2": "飲食文化",
+        "desc": "紅磚園邸是一間距離樹林火車站不到兩公里的義式動物餐廳。餐廳由傳統紅磚三合院改建而成，刻意保留了裸露的紅磚與水泥原始風貌，營造出遠離都市喧囂的純樸鄉村氣息。店內主打「現點現做」的義式料理。",
+        "story": "這間餐廳由陳皇志與王佩蓁夫婦從零開始打造。原本毫無餐飲與設計背景的兩人，出於對美食與水豚的熱愛，克服了初期的經費限制與技術困難，親自包辦設計與裝潢，甚至為了顧客的舒適度堅持訂做專屬尺寸的桌椅。他們秉持著「生活就該浪費在美好的事物上」的義大利哲學，致力於提供優質的餐點、環境與服務。 在經營過程中，團隊不僅鼓勵客人與動物互動，更會主動解說生態知識，傳遞保護動物的意識。未來，夫妻倆期望「紅磚園邸」不再只是一間餐廳，而是一個具有深刻價值觀與責任感的品牌，將這份對細節的堅持與對動物的用心拓展至更多領域。",
+        "era": "現代",
+        "site": "樹林",
+        "url": "",
+        "video": "",
+        "stage": "",
+        "出處": "引用自新北市立樹林高級中學所編輯之《樹林采風》雜誌",
+        "pic01_url": "",
+        "pic01_desc": "",
+        "pic01_grapher": "",
+        "pic01_courtesy": "",
+        "pic02_url": "",
+        "pic02_desc": "",
+        "pic02_grapher": "",
+        "pic02_courtesy": "",
+        "pic03_url": "",
+        "pic03_desc": "",
+        "pic03_grapher": "",
+        "pic03_courtesy": "",
+        "pic04_url": "",
+        "pic04_desc": "",
+        "pic04_grapher": "",
+        "pic04_courtesy": "",
+        "pic05_url": "",
+        "pic05_desc": "",
+        "pic05_grapher": "",
+        "pic05_courtesy": "",
+        "pic06_url": "",
+        "pic06_desc": "",
+        "pic06_grapher": "",
+        "pic06_courtesy": "",
+        "pic07_url": "",
+        "pic07_desc": "",
+        "pic07_grapher": "",
+        "pic07_courtesy": "",
+        "pic08_url": "",
+        "pic08_desc": "",
+        "pic08_grapher": "",
+        "pic08_courtesy": "",
+        "pic09_url": "",
+        "pic09_desc": "",
+        "pic09_grapher": "",
+        "pic09_courtesy": "",
+        "podcast_url": "https://dl.dropboxusercontent.com/scl/fi/gy1a9enyyvlz7lzxewgd0/.mp3?rlkey=yk85dy23b17gx5e59yblzs3zd&st=eacvqfnp&dl=0",
+        "podcast_start": 870
+      }
+    }
+  ]
+};
+
+        // 預先載入圖片
+        function preloadFirstImages() {
+            geojsonData.features.forEach(function(feature) {
+                var url = feature.properties.pic01_url;
+                if (url) { var img = new Image(); img.src = url; }
+            });
+        }
+        preloadFirstImages();
+
+        var markersClusterGroup = L.markerClusterGroup({
+            maxClusterRadius: 35, spiderfyOnMaxZoom: true, showCoverageOnHover: false, zoomToBoundsOnClick: true
+        });
+
+        var geojsonLayer = L.geoJSON(geojsonData, {
+            style: function (feature) {
+                if (feature.geometry.type === 'LineString') {
+                    return { color: '#334155', weight: 5, dashArray: '6, 8', opacity: 0.85, lineCap: 'square' };
+                }
+            },
+            pointToLayer: function (feature, latlng) {
+                var props = feature.properties;
+                var shortName = props.name || '';
+                var catStyle = getCategoryStyle(props.type1);
+                
+                var customIcon = L.divIcon({
+                    className: 'custom-marker',
+                    html: `
+                        <div class="marker-pin" style="--cat-color: ${catStyle.color};">
+                            <i class="fa-solid ${catStyle.icon}"></i>
+                        </div>
+                        <div class="marker-label" style="--cat-color: ${catStyle.color};">${shortName}</div>
+                    `,
+                    iconSize: [140, 45], iconAnchor: [70, 45]
+                });
+                return L.marker(latlng, { icon: customIcon });
+            },
+            onEachFeature: function (feature, layer) {
+                var props = feature.properties;
+                if (feature.geometry.type === 'LineString' && props.name) {
+                    layer.bindTooltip(props.name, { sticky: true, className: 'route-tooltip', direction: 'top', offset: [0, -5] });
+                }
+
+                layer.on('click', function(e) {
+                    if (feature.geometry.type === 'Point') {
+                        if (activeMarkerElement) { activeMarkerElement.classList.remove('active'); }
+                        activeMarkerElement = e.target._icon;
+                        if (activeMarkerElement) { activeMarkerElement.classList.add('active'); }
+                        map.panTo(e.latlng, { animate: true });
+                    } else if (feature.geometry.type === 'LineString') {
+                        map.fitBounds(layer.getBounds(), { padding: [50, 50] });
+                    }
+
+                    document.getElementById('empty-state').classList.add('hidden');
+                    document.getElementById('content-area').classList.remove('hidden');
+                    
+                    var spotName = props.name || '未命名景點';
+                    document.getElementById('spot-title').innerText = spotName;
+                    
+                    // 動態更新詳細介紹標題旁邊的插圖
+                    var uniqueSVGCode = getDetailedIllustrativeSVG(spotName);
+                    document.getElementById('spot-unique-icon-badge').innerHTML = uniqueSVGCode;
+                    
+                    var tagsContainer = document.getElementById('tags-container');
+                    var tagSpot = document.getElementById('spot-tag');
+                    var tagEra = document.getElementById('spot-era');
+                    var hasTags = false;
+                    
+                    if (props.type1) {
+                        var typeText = props.type1;
+                        if(props.type2) typeText += ' / ' + props.type2;
+                        tagSpot.innerText = typeText;
+                        tagSpot.classList.remove('hidden');
+                        hasTags = true;
+                    } else { tagSpot.classList.add('hidden'); }
+
+                    if (props.era) {
+                        tagEra.innerText = props.era;
+                        tagEra.classList.remove('hidden');
+                        hasTags = true;
+                    } else { tagEra.classList.add('hidden'); }
+                    
+                    if(hasTags) tagsContainer.classList.remove('hidden');
+                    else tagsContainer.classList.add('hidden');
+
+                    currentImages = [];
+                    for (var i = 1; i <= 9; i++) {
+                        var numStr = (i < 10) ? '0' + i : i;
+                        var picUrl = props['pic' + numStr + '_url'];
+                        if (picUrl && picUrl.trim() !== '') {
+                            currentImages.push({
+                                url: picUrl,
+                                desc: props['pic' + numStr + '_desc'] || '',
+                                grapher: props['pic' + numStr + '_grapher'] || '',
+                                courtesy: props['pic' + numStr + '_courtesy'] || ''
+                            });
+                        }
+                    }
+                    currentImgIndex = 0;
+                    renderGallery();
+
+                    var podcastContainer = document.getElementById('podcast-player-container');
+                    if (props.podcast_url) {
+                        // 判斷是否為 Google Drive 或 Dropbox 網址
+                        if (props.podcast_url.includes('drive.google.com') && !props.podcast_url.includes('uc?')) {
+                            // 若為 Google Drive View 網頁，改為顯示精緻的跳轉按鈕
+                            podcastContainer.innerHTML = `
+                                <div style="text-align: center; padding: 5px 0;">
+                                    <p style="font-size: 0.85rem; color: #64748b; margin-top: 0; margin-bottom: 12px;">(點擊下方按鈕，將開啟播放視窗)</p>
+                                    <a href="${props.podcast_url}" target="_blank" style="display: inline-block; background-color: #16a34a; color: white; padding: 10px 24px; border-radius: 24px; text-decoration: none; font-weight: bold; box-shadow: 0 4px 10px rgba(22, 163, 74, 0.3); transition: transform 0.2s;">
+                                        <i class="fa-solid fa-play"></i> 收聽本站導覽
+                                    </a>
+                                </div>
+                            `;
+                        } else {
+                            // 若為 Dropbox 串流或其他原生網址，使用內建播放器
+                            podcastContainer.innerHTML = `<audio id="current-podcast" controls src="${props.podcast_url}"></audio>`;
+                            
+                            var audioEl = document.getElementById('current-podcast');
+                            if (props.podcast_start !== undefined && props.podcast_start > 0) {
+                                audioEl.addEventListener('loadedmetadata', function() {
+                                    audioEl.currentTime = props.podcast_start;
+                                });
+                                audioEl.addEventListener('canplay', function() {
+                                    if (audioEl.currentTime < props.podcast_start - 1 || audioEl.currentTime > props.podcast_start + 1) {
+                                        audioEl.currentTime = props.podcast_start;
+                                    }
+                                });
+                            }
+                        }
+                    } else {
+                        podcastContainer.innerHTML = `<div class="podcast-placeholder">🎙️ 導覽錄製中... 敬請期待</div>`;
+                    }
+
+                    var descContainer = document.getElementById('spot-desc-container');
+                    var descElement = document.getElementById('spot-desc');
+                    if (props.desc) {
+                        descElement.innerText = props.desc;
+                        descContainer.classList.remove('hidden');
+                    } else { descContainer.classList.add('hidden'); }
+                    
+                    var storyContainer = document.getElementById('spot-story-container');
+                    var storyElement = document.getElementById('spot-story');
+                    if (props.story) {
+                        storyElement.innerText = props.story;
+                        storyContainer.classList.remove('hidden');
+                    } else { storyContainer.classList.add('hidden'); }
+                });
+            }
+        });
+
+        markersClusterGroup.addLayer(geojsonLayer);
+        map.addLayer(markersClusterGroup);
+        map.fitBounds(markersClusterGroup.getBounds(), { padding: [40, 40] });
+        
+    </script>
+</body>
+</html>
